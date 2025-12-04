@@ -1,1 +1,3 @@
 /generate-icons.html
+node_modules/
+server.log
