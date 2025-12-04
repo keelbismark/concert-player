@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Concert Player v3.1</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/playlist.css">
+    <link rel="stylesheet" href="css/controls.css">
+    <link rel="stylesheet" href="css/modals.css">
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#07080a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+    <!-- Additional CSS -->
+    <link rel="stylesheet" href="css/touch.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">🎵</div>
+            <div class="logo-text">
+                Pro Concert Player
+                <span class="logo-version">v3.1</span>
+            </div>
+        </div>
+
+        <!-- Concert Timer -->
+        <div class="concert-timer">
+            <div class="concert-timer-display">
+                <div class="concert-timer-label">Время шоу</div>
+                <div class="concert-timer-value" id="concert-timer">00:00:00</div>
+            </div>
+            <div class="concert-timer-actions">
+                <button class="timer-btn" id="concert-timer-btn" title="Старт/Пауза">▶</button>
+                <button class="timer-btn" id="concert-timer-reset" title="Сброс">↺</button>
+            </div>
+        </div>
+        
+        <div class="header-controls">
+            <div class="mode-toggle">
+                <button class="mode-btn active" data-mode="manual">MANUAL</button>
+                <button class="mode-btn" data-mode="auto">AUTO</button>
+            </div>
+            
+            <button class="header-btn" id="import-btn" title="Импорт">📥</button>
+            <button class="header-btn" id="export-btn" title="Экспорт">📤</button>
+            <button class="header-btn" id="clear-btn" title="Очистить">🗑️</button>
+            <button class="header-btn" id="settings-btn" title="Настройки">⚙️</button>
+            <button class="header-btn" id="fullscreen-btn" title="Полный экран">⛶</button>
+            <button class="header-btn" id="hotkeys-btn" title="Горячие клавиши">⌨️</button>
+            <button class="header-btn" id="remote-btn" title="Mobile Remote">📱</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        <!-- Playlist Panel -->
+        <section class="playlist-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <span class="panel-title-icon">📋</span>
+                    <span>Плейлист</span>
+                </div>
+                <div class="panel-actions">
+                    <button class="panel-btn" id="schedule-btn">
+                        <span>📅</span>
+                        <span>Расписание</span>
+                    </button>
+                    <span id="track-count">0 треков</span>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="search-container">
+                <div class="search-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="search-input" id="search-input" placeholder="Поиск по названию...">
+                </div>
+            </div>
+            
+            <!-- Drop Area -->
+            <div id="drop-area">
+                <div class="drop-icon">📁</div>
+                <div class="drop-title">Перетащите аудио файлы</div>
+                <div class="drop-subtitle">MP3, WAV, OGG, FLAC</div>
+            </div>
+            
+            <!-- Playlist -->
+            <ul id="playlist">
+                <li class="empty-state">
+                    <div class="icon">🎵</div>
+                    <p>Плейлист пуст</p>
+                    <small>Загрузите треки для начала работы</small>
+                </li>
+            </ul>
+
+            <!-- Footer -->
+            <div class="playlist-footer">
+                <div class="footer-stat" id="total-duration">
+                    <span>Общая:</span>
+                    <span class="footer-stat-value">00:00</span>
+                </div>
+                <div class="footer-stat" id="remaining-duration">
+                    <span>Осталось:</span>
+                    <span class="footer-stat-value">--:--</span>
+                </div>
+                <div class="footer-stat" id="end-time">
+                    <span>Окончание:</span>
+                    <span class="footer-stat-value">--:--</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Now Playing Panel -->
+        <aside class="now-playing-panel">
+            <div class="now-playing-header">
+                <div class="now-playing-label">
+                    <span class="pulse-dot"></span>
+                    Сейчас играет
+                </div>
+                <div class="now-playing-title" id="current-track-name">—</div>
+                <div class="now-playing-note" id="current-track-note"></div>
+                <div class="next-up-info" id="next-track-info"></div>
+            </div>
+
+            <!-- Visualizer -->
+            <div class="visualizer-container">
+                <canvas id="visualizer"></canvas>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-section">
+                <div class="progress-bar-container" id="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                    <div class="progress-hover" id="progress-hover">0:00</div>
+                </div>
+                <div class="time-display">
+                    <span id="time-current">0:00</span>
+                    <span id="time-total">0:00</span>
+                </div>
+            </div>
+
+            <!-- Speed Control -->
+            <div class="speed-section">
+                <span class="speed-label">Скорость</span>
+                <input type="range" class="speed-slider" id="speed-slider" min="0.5" max="2" step="0.05" value="1">
+                <span class="speed-value" id="speed-value">1.00x</span>
+                <button class="speed-reset" id="speed-reset">Reset</button>
+            </div>
+
+            <!-- Loop -->
+            <div class="loop-section">
+                <button class="loop-btn" id="loop-btn">
+                    <span>🔁</span>
+                    <span>Loop</span>
+                </button>
+                <button class="loop-btn" id="loop-all-btn">
+                    <span>🔂</span>
+                    <span>Loop All</span>
+                </button>
+            </div>
+
+            <!-- Big Timer -->
+            <div class="big-timer">
+                <div id="timer">--:--</div>
+                <div class="timer-label">Осталось</div>
+            </div>
+
+            <!-- Volume -->
+            <div class="volume-section">
+                <span class="volume-icon" id="volume-icon">🔊</span>
+                <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
+                <span class="volume-value" id="volume-value">100%</span>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Main Controls -->
+    <footer id="main-controls">
+        <button id="prev-btn" class="control-button btn-secondary">
+            <span class="control-icon">⏮</span>
+            <span class="hotkey">←</span>
+        </button>
+        
+        <button id="pause-btn" class="control-button btn-secondary">
+            <span class="control-icon">⏸</span>
+            <span>PAUSE</span>
+            <span class="hotkey">P</span>
+        </button>
+        
+        <button id="play-btn" class="control-button btn-primary">
+            <span class="control-icon">▶</span>
+            <span>PLAY</span>
+            <span class="hotkey">SPACE</span>
+        </button>
+        
+        <button id="next-btn" class="control-button btn-secondary">
+            <span class="control-icon">⏭</span>
+            <span class="hotkey">ENTER</span>
+        </button>
+    </footer>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="modal-title-icon">⚙️</span>
+                    <span>Настройки</span>
+                </div>
+                <button class="modal-close" id="settings-close">✕</button>
+            </div>
+            <div class="modal-body" id="settings-body"></div>
+        </div>
+    </div>
+
+    <!-- Note Modal -->
+    <div class="modal-overlay" id="note-modal">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="modal-title-icon">📝</span>
+                    <span>Заметка к треку</span>
+                </div>
+                <button class="modal-close" id="note-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="note-track-title" id="note-track-title"></div>
+                <textarea class="note-input" id="note-input" placeholder="Например: Ждать отмашки режиссёра..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" id="note-cancel">Отмена</button>
+                <button class="modal-btn primary" id="note-save">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hotkeys Panel -->
+    <div class="hotkeys-panel" id="hotkeys-panel">
+        <div class="hotkeys-title">⌨️ Горячие клавиши</div>
+        <div class="hotkeys-list">
+            <div class="hotkey-item">
+                <span class="hotkey-action">Play / Stop</span>
+                <span class="hotkey-key">SPACE</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Пауза</span>
+                <span class="hotkey-key">P</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Следующий</span>
+                <span class="hotkey-key">ENTER</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Предыдущий</span>
+                <span class="hotkey-key">←</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Громкость</span>
+                <span class="hotkey-key">↑ ↓</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Перемотка ±5с</span>
+                <span class="hotkey-key">[ ]</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Loop</span>
+                <span class="hotkey-key">L</span>
+            </div>
+            <div class="hotkey-item">
+                <span class="hotkey-action">Полный экран</span>
+                <span class="hotkey-key">F</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Hidden inputs -->
+    <input type="file" id="file-input" multiple accept="audio/*" hidden>
+    <input type="file" id="import-input" accept=".json" hidden>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/Settings.js"></script>
+    <script src="js/AudioEngine.js"></script>
+    <script src="js/Playlist.js"></script>
+    <script src="js/Visualizer.js"></script>
+    <script src="js/UI.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#07080a">
+    <title>Concert Remote</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/remote.css">
+</head>
+<body>
+    <!-- Connection Status -->
+    <div class="connection-status disconnected" id="connection-status">
+        Подключение...
+    </div>
+
+    <!-- Remote Container -->
+    <div class="remote-container">
+        <!-- Now Playing -->
+        <div class="now-playing-card">
+            <div class="remote-track-label">Сейчас играет</div>
+            <div class="remote-track-title" id="remote-track-title">—</div>
+            <div class="remote-track-note" id="remote-track-note"></div>
+            
+            <div class="remote-timer" id="remote-timer">--:--</div>
+            
+            <div class="remote-progress">
+                <div class="remote-progress-bar" id="remote-progress"></div>
+            </div>
+            <div class="remote-time">
+                <span id="remote-time-current">0:00</span>
+                <span id="remote-time-total">0:00</span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="remote-controls">
+            <button class="remote-btn remote-btn-secondary" id="remote-prev">⏮</button>
+            <button class="remote-btn remote-btn-pause" id="remote-pause">⏸</button>
+            <button class="remote-btn remote-btn-primary" id="remote-play">▶</button>
+            <button class="remote-btn remote-btn-secondary" id="remote-next">⏭</button>
+        </div>
+
+        <!-- Next Up -->
+        <div class="next-up-card" id="next-up-card">
+            <div>
+                <div class="next-up-label">Следующий</div>
+                <div class="next-up-title" id="next-up-title">—</div>
+            </div>
+            <div class="next-up-duration" id="next-up-duration">--:--</div>
+        </div>
+
+        <!-- Playlist -->
+        <div class="remote-playlist">
+            <div class="remote-playlist-header">
+                <span class="remote-playlist-title">Плейлист</span>
+                <span class="remote-playlist-count" id="playlist-count">0 треков</span>
+            </div>
+            <div id="remote-playlist-items"></div>
+        </div>
+
+        <!-- Volume -->
+        <div class="volume-card">
+            <span class="volume-icon" id="remote-volume-icon">🔊</span>
+            <div class="volume-slider-container">
+                <input type="range" class="volume-slider" id="remote-volume" min="0" max="100" value="100">
+            </div>
+            <span class="volume-value" id="remote-volume-value">100%</span>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * Mobile Remote Client
+     */
+    class RemoteClient {
+        constructor() {
+            this.channel = null;
+            this.sessionId = null;
+            this.isConnected = false;
+            this.reconnectAttempts = 0;
+            this.maxReconnectAttempts = 5;
+
+            this.cacheElements();
+            this.init();
+        }
+
+        cacheElements() {
+            this.elements = {
+                status: document.getElementById('connection-status'),
+                trackTitle: document.getElementById('remote-track-title'),
+                trackNote: document.getElementById('remote-track-note'),
+                timer: document.getElementById('remote-timer'),
+                progress: document.getElementById('remote-progress'),
+                timeCurrent: document.getElementById('remote-time-current'),
+                timeTotal: document.getElementById('remote-time-total'),
+                playBtn: document.getElementById('remote-play'),
+                pauseBtn: document.getElementById('remote-pause'),
+                prevBtn: document.getElementById('remote-prev'),
+                nextBtn: document.getElementById('remote-next'),
+                nextUpTitle: document.getElementById('next-up-title'),
+                nextUpDuration: document.getElementById('next-up-duration'),
+                nextUpCard: document.getElementById('next-up-card'),
+                playlistItems: document.getElementById('remote-playlist-items'),
+                playlistCount: document.getElementById('playlist-count'),
+                volumeSlider: document.getElementById('remote-volume'),
+                volumeValue: document.getElementById('remote-volume-value'),
+                volumeIcon: document.getElementById('remote-volume-icon')
+            };
+        }
+
+        init() {
+            // Get session ID from URL
+            const params = new URLSearchParams(window.location.search);
+            this.sessionId = params.get('session');
+
+            if (!this.sessionId) {
+                this.showError('Сессия не найдена. Откройте ссылку с QR-кода.');
+                return;
+            }
+
+            this.connect();
+            this.bindEvents();
+        }
+
+        connect() {
+            try {
+                this.updateStatus('connecting');
+                
+                this.channel = new BroadcastChannel(`concert-player-${this.sessionId}`);
+                
+                this.channel.onmessage = (event) => {
+                    this.handleMessage(event.data);
+                };
+
+                // Send connect message
+                this.channel.postMessage({ type: 'connect' });
+
+                // Request initial state
+                setTimeout(() => {
+                    this.channel.postMessage({ type: 'get-state' });
+                }, 100);
+
+                this.isConnected = true;
+                this.updateStatus('connected');
+                this.reconnectAttempts = 0;
+
+            } catch (err) {
+                console.error('Connection failed:', err);
+                this.handleDisconnect();
+            }
+        }
+
+        handleMessage(data) {
+            if (!data) return;
+
+            switch (data.type) {
+                case 'state':
+                    this.updateUI(data);
+                    break;
+                case 'server-stopped':
+                    this.handleDisconnect();
+                    break;
+            }
+        }
+
+        handleDisconnect() {
+            this.isConnected = false;
+            this.updateStatus('disconnected');
+
+            // Try to reconnect
+            if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                this.reconnectAttempts++;
+                setTimeout(() => this.connect(), 2000);
+            }
+        }
+
+        updateStatus(status) {
+            const el = this.elements.status;
+            el.className = 'connection-status ' + status;
+            
+            switch (status) {
+                case 'connected':
+                    el.textContent = '✓ Подключено';
+                    break;
+                case 'disconnected':
+                    el.textContent = '✕ Отключено';
+                    break;
+                case 'connecting':
+                    el.textContent = '⟳ Подключение...';
+                    break;
+            }
+        }
+
+        showError(message) {
+            this.elements.status.textContent = message;
+            this.elements.status.className = 'connection-status disconnected';
+        }
+
+        updateUI(state) {
+            // Track info
+            if (state.currentTrack) {
+                this.elements.trackTitle.textContent = state.currentTrack.title;
+                this.elements.trackNote.textContent = state.currentTrack.note || '';
+                this.elements.timeTotal.textContent = this.formatTime(state.currentTrack.duration);
+            } else {
+                this.elements.trackTitle.textContent = '—';
+                this.elements.trackNote.textContent = '';
+                this.elements.timeTotal.textContent = '0:00';
+            }
+
+            // Timer
+            const remaining = Math.max(0, state.duration - state.currentTime);
+            this.elements.timer.textContent = this.formatTime(remaining);
+            this.elements.timeCurrent.textContent = this.formatTime(state.currentTime);
+
+            // Timer warnings
+            this.elements.timer.classList.remove('warning', 'critical');
+            if (remaining <= 5 && remaining > 0) {
+                this.elements.timer.classList.add('critical');
+            } else if (remaining <= 15) {
+                this.elements.timer.classList.add('warning');
+            }
+
+            // Progress
+            const progress = state.duration > 0 ? (state.currentTime / state.duration) * 100 : 0;
+            this.elements.progress.style.width = `${progress}%`;
+
+            // Play/Pause buttons
+            if (state.isPlaying) {
+                this.elements.playBtn.innerHTML = '⏹';
+                this.elements.playBtn.classList.add('playing');
+            } else {
+                this.elements.playBtn.innerHTML = '▶';
+                this.elements.playBtn.classList.remove('playing');
+            }
+
+            if (state.isPaused) {
+                this.elements.pauseBtn.innerHTML = '▶';
+                this.elements.pauseBtn.classList.add('paused');
+            } else {
+                this.elements.pauseBtn.innerHTML = '⏸';
+                this.elements.pauseBtn.classList.remove('paused');
+            }
+
+            // Next track
+            if (state.nextTrack) {
+                this.elements.nextUpTitle.textContent = state.nextTrack.title;
+                this.elements.nextUpDuration.textContent = this.formatTime(state.nextTrack.duration);
+                this.elements.nextUpCard.style.display = '';
+            } else {
+                this.elements.nextUpCard.style.display = 'none';
+            }
+
+            // Volume
+            this.elements.volumeSlider.value = state.volume;
+            this.elements.volumeValue.textContent = `${state.volume}%`;
+            this.updateVolumeIcon(state.volume);
+
+            // Playlist
+            this.renderPlaylist(state.playlist, state.currentTrack?.index);
+            this.elements.playlistCount.textContent = `${state.playlistLength} треков`;
+        }
+
+        renderPlaylist(tracks, currentIndex) {
+            if (!tracks) return;
+
+            this.elements.playlistItems.innerHTML = tracks.map((track, i) => `
+                <div class="remote-track-item ${i === currentIndex ? 'current playing' : ''}" 
+                     data-index="${i}">
+                    <div class="remote-track-number">${i + 1}</div>
+                    <div class="remote-track-info">
+                        <div class="remote-track-name">${track.title}</div>
+                        <div class="remote-track-duration">${this.formatTime(track.duration)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Bind click events
+            this.elements.playlistItems.querySelectorAll('.remote-track-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const index = parseInt(item.dataset.index);
+                    this.send('select', { index });
+                });
+            });
+        }
+
+        updateVolumeIcon(value) {
+            if (value == 0) {
+                this.elements.volumeIcon.textContent = '🔇';
+            } else if (value < 50) {
+                this.elements.volumeIcon.textContent = '🔉';
+            } else {
+                this.elements.volumeIcon.textContent = '🔊';
+            }
+        }
+
+        send(type, data = {}) {
+            if (this.channel && this.isConnected) {
+                this.channel.postMessage({ type, ...data });
+            }
+        }
+
+        bindEvents() {
+            // Play/Stop
+            this.elements.playBtn.addEventListener('click', () => {
+                const isPlaying = this.elements.playBtn.classList.contains('playing');
+                this.send(isPlaying ? 'stop' : 'play');
+                this.vibrate();
+            });
+
+            // Pause
+            this.elements.pauseBtn.addEventListener('click', () => {
+                this.send('pause');
+                this.vibrate();
+            });
+
+            // Next/Prev
+            this.elements.nextBtn.addEventListener('click', () => {
+                this.send('next');
+                this.vibrate();
+            });
+
+            this.elements.prevBtn.addEventListener('click', () => {
+                this.send('prev');
+                this.vibrate();
+            });
+
+            // Volume
+            this.elements.volumeSlider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                this.send('volume', { value });
+                this.elements.volumeValue.textContent = `${value}%`;
+                this.updateVolumeIcon(value);
+            });
+
+            // Prevent zoom
+            document.addEventListener('gesturestart', e => e.preventDefault());
+        }
+
+        vibrate(duration = 30) {
+            if (navigator.vibrate) {
+                navigator.vibrate(duration);
+            }
+        }
+
+        formatTime(seconds) {
+            if (!seconds || !isFinite(seconds)) return '0:00';
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec.toString().padStart(2, '0')}`;
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        new RemoteClient();
+    });
+
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+    </script>
+</body>
+</html>
