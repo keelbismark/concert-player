@@ -1,77 +1,85 @@
 /**
- * Remote Control Server using BroadcastChannel API
- * For same-origin remote control (no external server needed)
+ * Remote Control Connection using WebSockets
  */
-
-class RemoteServer {
+class RemoteConnection {
     constructor(app) {
         this.app = app;
         this.isRunning = false;
-        this.channel = null;
+        this.ws = null;
         this.remoteUrl = '';
         this.connectedClients = 0;
         this.lastState = null;
-
-        // Generate unique session ID
-        this.sessionId = this.generateSessionId();
-    }
-
-    generateSessionId() {
-        return Math.random().toString(36).substring(2, 10);
     }
 
     /**
-     * Start the remote server
+     * Start the remote connection
      */
     start() {
         if (this.isRunning) return;
 
         try {
-            // Create broadcast channel for communication
-            this.channel = new BroadcastChannel(`concert-player-${this.sessionId}`);
-            
-            // Listen for messages from remotes
-            this.channel.onmessage = (event) => this.handleMessage(event.data);
+            const wsUrl = `ws://${window.location.host}`;
+            this.ws = new WebSocket(wsUrl);
 
-            this.isRunning = true;
-            this.remoteUrl = `${window.location.origin}/remote.html?session=${this.sessionId}`;
+            this.ws.onopen = () => {
+                console.log('WebSocket connection established');
+                this.isRunning = true;
+                this.app.ui.showToast('Remote control enabled', 'success');
+                // Identify this client as the main application
+                this.ws.send(JSON.stringify({ type: 'identify', clientType: 'main-app' }));
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    this.handleMessage(message);
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                }
+            };
+
+            this.ws.onclose = () => {
+                console.log('WebSocket connection closed');
+                this.isRunning = false;
+                this.app.ui.showToast('Remote control disconnected', 'warning');
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.app.ui.showToast('Remote control connection error', 'error');
+            };
+
+            this.remoteUrl = `${window.location.origin}/remote.html`;
 
             // Start state broadcasting
             this.startStateBroadcast();
-
-            console.log('Remote server started:', this.remoteUrl);
             
             return {
                 success: true,
-                url: this.remoteUrl,
-                sessionId: this.sessionId
+                url: this.remoteUrl
             };
         } catch (err) {
-            console.error('Failed to start remote server:', err);
+            console.error('Failed to start remote connection:', err);
             return { success: false, error: err.message };
         }
     }
 
     /**
-     * Stop the remote server
+     * Stop the remote connection
      */
     stop() {
         if (!this.isRunning) return;
-
         this.stopStateBroadcast();
-
-        if (this.channel) {
-            this.channel.postMessage({ type: 'server-stopped' });
-            this.channel.close();
-            this.channel = null;
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
         }
-
         this.isRunning = false;
-        console.log('Remote server stopped');
+        console.log('Remote connection stopped');
     }
 
     /**
-     * Handle incoming messages from remotes
+     * Handle incoming messages from the server
      */
     handleMessage(data) {
         if (!data || !data.type) return;
@@ -79,54 +87,36 @@ class RemoteServer {
         console.log('Remote command:', data.type);
 
         switch (data.type) {
-            case 'connect':
-                this.connectedClients++;
-                this.sendState();
-                this.app.ui.showToast(`Remote подключён (${this.connectedClients})`, 'success');
-                break;
-
-            case 'disconnect':
-                this.connectedClients = Math.max(0, this.connectedClients - 1);
-                break;
-
             case 'play':
                 this.app.play();
                 break;
-
             case 'stop':
                 this.app.stop();
                 break;
-
             case 'pause':
                 this.app.togglePause();
                 break;
-
             case 'next':
                 this.app.nextTrack();
                 break;
-
             case 'prev':
                 this.app.prevTrack();
                 break;
-
             case 'select':
                 if (typeof data.index === 'number') {
                     this.app.selectTrack(data.index);
                 }
                 break;
-
             case 'volume':
                 if (typeof data.value === 'number') {
                     this.app.setVolume(data.value);
                 }
                 break;
-
             case 'seek':
                 if (typeof data.position === 'number') {
                     this.app.audioEngine.seek(data.position);
                 }
                 break;
-
             case 'get-state':
                 this.sendState();
                 break;
@@ -134,10 +124,10 @@ class RemoteServer {
     }
 
     /**
-     * Send current state to all remotes
+     * Send current state to the server
      */
     sendState() {
-        if (!this.channel || !this.isRunning) return;
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
         const track = this.app.playlist.getCurrent();
         const nextTrack = this.app.playlist.getNext();
@@ -168,7 +158,7 @@ class RemoteServer {
             playlistLength: this.app.playlist.length
         };
 
-        this.channel.postMessage(state);
+        this.ws.send(JSON.stringify(state));
         this.lastState = state;
     }
 
@@ -204,7 +194,6 @@ class RemoteServer {
      * Get QR code URL for remote
      */
     getQRCodeUrl() {
-        // Using a free QR code API
         const encodedUrl = encodeURIComponent(this.remoteUrl);
         return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodedUrl}`;
     }
@@ -249,17 +238,12 @@ class RemoteServer {
                     <button id="copy-remote-url" class="modal-btn primary" style="width: 100%;">
                         📋 Копировать ссылку
                     </button>
-                    
-                    <p style="margin-top: 20px; font-size: 0.85rem; color: var(--text-muted);">
-                        Подключено устройств: <strong id="connected-count">${this.connectedClients}</strong>
-                    </p>
                 </div>
             </div>
         `;
 
         document.body.appendChild(modal);
 
-        // Close handler
         modal.querySelector('#remote-modal-close').addEventListener('click', () => {
             modal.remove();
         });
@@ -268,22 +252,11 @@ class RemoteServer {
             if (e.target === modal) modal.remove();
         });
 
-        // Copy handler
         modal.querySelector('#copy-remote-url').addEventListener('click', () => {
             navigator.clipboard.writeText(this.remoteUrl).then(() => {
                 this.app.ui.showToast('Ссылка скопирована', 'success');
             });
         });
-
-        // Update connected count
-        const countEl = modal.querySelector('#connected-count');
-        const updateCount = setInterval(() => {
-            if (document.contains(modal)) {
-                countEl.textContent = this.connectedClients;
-            } else {
-                clearInterval(updateCount);
-            }
-        }, 1000);
     }
 
     destroy() {
@@ -293,5 +266,5 @@ class RemoteServer {
 
 // Export
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = RemoteServer;
+    module.exports = RemoteConnection;
 }

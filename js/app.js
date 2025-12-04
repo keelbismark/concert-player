@@ -32,7 +32,7 @@ class ConcertPlayerApp {
         this.visualizer = null;
         this.touchMode = null;
         this.dragDrop = null;
-        this.remoteServer = null;
+        this.remoteConnection = null;
 
         // Initialize everything
         this.init();
@@ -55,8 +55,8 @@ class ConcertPlayerApp {
             // 4. Initialize drag & drop
             this.initDragDrop();
 
-            // 5. Initialize remote server
-            this.initRemoteServer();
+            // 5. Initialize remote connection
+            this.initRemoteConnection();
 
             // 6. Set initial volume
             this.setVolume(this.volume);
@@ -151,11 +151,12 @@ class ConcertPlayerApp {
     }
 
     /**
-     * Initialize remote control server
+     * Initialize remote control connection
      */
-    initRemoteServer() {
-        if (typeof RemoteServer !== 'undefined') {
-            this.remoteServer = new RemoteServer(this);
+    initRemoteConnection() {
+        if (typeof RemoteConnection !== 'undefined') {
+            this.remoteConnection = new RemoteConnection(this);
+            this.remoteConnection.start();
         }
     }
 
@@ -1017,8 +1018,8 @@ class ConcertPlayerApp {
      * Show remote control modal
      */
     showRemoteControl() {
-        if (this.remoteServer) {
-            this.remoteServer.showConnectionModal();
+        if (this.remoteConnection) {
+            this.remoteConnection.showConnectionModal();
         } else {
             this.ui.showToast('Remote не доступен', 'warning');
         }
@@ -1028,8 +1029,8 @@ class ConcertPlayerApp {
      * Broadcast state to remotes
      */
     broadcastState() {
-        if (this.remoteServer && this.remoteServer.isRunning) {
-            this.remoteServer.sendState();
+        if (this.remoteConnection && this.remoteConnection.isRunning) {
+            this.remoteConnection.sendState();
         }
     }
 
@@ -1075,8 +1076,8 @@ class ConcertPlayerApp {
         if (this.dragDrop) {
             this.dragDrop.destroy();
         }
-        if (this.remoteServer) {
-            this.remoteServer.destroy();
+        if (this.remoteConnection) {
+            this.remoteConnection.destroy();
         }
         if (this.audioEngine) {
             this.audioEngine.destroy();
