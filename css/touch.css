@@ -1,0 +1,244 @@
+/* ============================================
+   TOUCH MODE STYLES
+   ============================================ */
+
+/* Touch mode active state */
+body.touch-mode {
+    /* Larger touch targets */
+    --touch-target-min: 48px;
+    --touch-spacing: 12px;
+}
+
+/* Larger buttons in touch mode */
+body.touch-mode .control-button {
+    min-height: var(--touch-target-min);
+    padding: 16px 28px;
+    font-size: 1.1rem;
+}
+
+body.touch-mode .btn-primary {
+    padding: 20px 50px;
+    font-size: 1.2rem;
+}
+
+body.touch-mode .header-btn,
+body.touch-mode .timer-btn {
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    font-size: 1.2rem;
+}
+
+body.touch-mode .track-item {
+    padding: 16px 18px;
+    min-height: 70px;
+}
+
+body.touch-mode .track-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+}
+
+body.touch-mode .track-actions {
+    opacity: 1;
+    gap: 8px;
+}
+
+body.touch-mode .track-number {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+}
+
+/* Larger sliders */
+body.touch-mode .volume-slider,
+body.touch-mode .speed-slider {
+    height: 8px;
+}
+
+body.touch-mode .volume-slider::-webkit-slider-thumb,
+body.touch-mode .speed-slider::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+}
+
+body.touch-mode .progress-bar-container {
+    height: 12px;
+}
+
+body.touch-mode .progress-bar::after {
+    width: 24px;
+    height: 24px;
+    right: -12px;
+    transform: translateY(-50%) scale(1);
+}
+
+/* Larger loop buttons */
+body.touch-mode .loop-btn {
+    padding: 16px;
+    font-size: 1rem;
+}
+
+/* Touch feedback */
+body.touch-mode .track-item:active,
+body.touch-mode .control-button:active,
+body.touch-mode .header-btn:active,
+body.touch-mode .loop-btn:active {
+    transform: scale(0.97);
+    opacity: 0.8;
+}
+
+/* Disable hover effects on touch */
+@media (hover: none) and (pointer: coarse) {
+    .track-item:hover {
+        transform: none;
+        background: inherit;
+    }
+    
+    .control-button:hover {
+        transform: none;
+    }
+    
+    .header-btn:hover {
+        transform: none;
+    }
+}
+
+/* Touch indicator for drag */
+body.touch-mode .touch-dragging {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.9;
+    transform: scale(1.05);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Touch mode toggle button */
+.touch-mode-toggle {
+    display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .touch-mode-toggle {
+        display: flex;
+    }
+}
+
+/* Swipe actions */
+.swipe-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.swipe-actions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+}
+
+.swipe-container.swiped .swipe-actions {
+    transform: translateX(0);
+}
+
+.swipe-action-btn {
+    height: 100%;
+    padding: 0 20px;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.swipe-action-btn.delete {
+    background: var(--danger);
+}
+
+.swipe-action-btn.edit {
+    background: var(--info);
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+    position: absolute;
+    top: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.pull-to-refresh.visible {
+    opacity: 1;
+    top: 10px;
+}
+
+.pull-to-refresh.refreshing {
+    animation: spin 1s linear infinite;
+}
+
+/* Safe area padding for notched devices */
+@supports (padding: max(0px)) {
+    body.touch-mode .header {
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-left: max(24px, env(safe-area-inset-left));
+        padding-right: max(24px, env(safe-area-inset-right));
+    }
+
+    body.touch-mode #main-controls {
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        padding-left: max(24px, env(safe-area-inset-left));
+        padding-right: max(24px, env(safe-area-inset-right));
+    }
+}
+
+/* Haptic feedback class (visual indicator) */
+.haptic-feedback {
+    animation: hapticPulse 0.1s ease;
+}
+
+@keyframes hapticPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(0.98); }
+}
+
+/* Long press indicator */
+.long-press-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 60px;
+    height: 60px;
+    margin: -30px 0 0 -30px;
+    border: 3px solid var(--accent-primary);
+    border-radius: 50%;
+    opacity: 0;
+    transform: scale(0);
+    pointer-events: none;
+}
+
+.long-press-indicator.active {
+    opacity: 1;
+    animation: longPressGrow 0.5s ease forwards;
+}
+
+@keyframes longPressGrow {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}

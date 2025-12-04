@@ -1,0 +1,826 @@
+/* ============================================
+   HEADER
+   ============================================ */
+
+.header {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-default);
+}
+
+/* Logo */
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.logo-icon {
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    border-radius: var(--radius-md);
+    font-size: 1.3rem;
+    box-shadow: 0 4px 15px var(--accent-glow);
+    transition: all var(--transition-normal);
+}
+
+.logo:hover .logo-icon {
+    transform: scale(1.05) rotate(-3deg);
+    box-shadow: 0 6px 25px var(--accent-glow);
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.logo-version {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   CONCERT TIMER
+   ============================================ */
+
+.concert-timer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-lg);
+}
+
+.concert-timer-display {
+    text-align: center;
+}
+
+.concert-timer-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.concert-timer-value {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--warning);
+    text-shadow: 0 0 20px var(--warning-glow);
+    letter-spacing: 2px;
+}
+
+.concert-timer-value.running {
+    color: var(--accent-primary);
+    text-shadow: 0 0 20px var(--accent-glow);
+    animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.concert-timer-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Timer Buttons - ИСПРАВЛЕНО */
+.timer-btn {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.timer-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    transform: scale(1.05);
+    border-color: var(--border-default);
+}
+
+.timer-btn:active {
+    transform: scale(0.95);
+}
+
+.timer-btn.active,
+.timer-btn.running {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+/* ============================================
+   HEADER CONTROLS
+   ============================================ */
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Mode Toggle */
+.mode-toggle {
+    display: flex;
+    padding: 4px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-muted);
+}
+
+.mode-btn {
+    padding: 8px 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.mode-btn:hover {
+    color: var(--text-secondary);
+}
+
+.mode-btn.active {
+    background: var(--accent-primary);
+    color: var(--bg-primary);
+    box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+/* Header Buttons */
+.header-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.header-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+    transform: translateY(-2px);
+}
+
+.header-btn:active {
+    transform: translateY(0);
+}
+
+/* ============================================
+   MAIN CONTAINER
+   ============================================ */
+
+.main-container {
+    position: relative;
+    z-index: var(--z-base);
+    display: flex;
+    gap: 20px;
+    padding: 20px 24px;
+    padding-bottom: 100px; /* Space for fixed controls */
+    min-height: calc(100vh - 70px);
+}
+
+/* ============================================
+   NOW PLAYING PANEL
+   ============================================ */
+
+.now-playing-panel {
+    position: sticky;
+    top: 90px;
+    width: 380px;
+    height: fit-content;
+    max-height: calc(100vh - 180px);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.now-playing-header {
+    padding: 24px;
+    text-align: center;
+    background: linear-gradient(180deg, var(--bg-tertiary), transparent);
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.now-playing-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    margin-bottom: 14px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent-primary);
+    background: var(--accent-subtle);
+    border-radius: var(--radius-full);
+}
+
+.now-playing-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 8px;
+}
+
+.now-playing-note {
+    font-size: 0.85rem;
+    color: var(--warning);
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 1.2em;
+}
+
+.next-up-info {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-muted);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   VISUALIZER - ИСПРАВЛЕНО
+   ============================================ */
+
+.visualizer-container {
+    position: relative;
+    height: 100px;
+    margin: 0;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+#visualizer {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ============================================
+   PROGRESS SECTION
+   ============================================ */
+
+.progress-section {
+    padding: 20px 24px;
+}
+
+.progress-bar-container {
+    position: relative;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    overflow: visible;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+    border-radius: var(--radius-full);
+    position: relative;
+    transition: width 0.05s linear;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    width: 14px;
+    height: 14px;
+    background: var(--text-primary);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent-glow);
+    transition: transform var(--transition-fast);
+}
+
+.progress-bar-container:hover .progress-bar::after {
+    transform: translateY(-50%) scale(1);
+}
+
+.progress-hover {
+    position: absolute;
+    top: -35px;
+    left: 0;
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateX(-50%);
+    transition: opacity var(--transition-fast);
+    white-space: nowrap;
+    z-index: 10;
+}
+
+.progress-bar-container:hover .progress-hover {
+    opacity: 1;
+}
+
+.time-display {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   SPEED CONTROL
+   ============================================ */
+
+.speed-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-muted);
+}
+
+.speed-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.speed-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+}
+
+.speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 8px var(--accent-glow);
+    transition: transform var(--transition-fast);
+}
+
+.speed-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.speed-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--accent-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.speed-value {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+    min-width: 50px;
+    text-align: right;
+}
+
+.speed-reset {
+    padding: 6px 12px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: var(--bg-hover);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.speed-reset:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+/* ============================================
+   LOOP SECTION
+   ============================================ */
+
+.loop-section {
+    display: flex;
+    gap: 10px;
+    padding: 12px 24px;
+}
+
+.loop-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.loop-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border-color: var(--border-default);
+}
+
+.loop-btn.active {
+    background: var(--accent-subtle);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+/* ============================================
+   BIG TIMER
+   ============================================ */
+
+.big-timer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 24px;
+    background: radial-gradient(ellipse at center, var(--bg-tertiary) 0%, transparent 70%);
+    min-height: 180px;
+}
+
+#timer {
+    font-family: var(--font-mono);
+    font-size: 4rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    text-shadow: 0 0 40px var(--accent-glow);
+    line-height: 1;
+    letter-spacing: -2px;
+    transition: all var(--transition-normal);
+}
+
+#timer.warning {
+    color: var(--warning);
+    text-shadow: 0 0 40px var(--warning-glow);
+}
+
+#timer.critical {
+    color: var(--danger);
+    text-shadow: 0 0 40px var(--danger-glow);
+    animation: blink 0.5s ease-in-out infinite;
+}
+
+.timer-label {
+    margin-top: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   VOLUME SECTION
+   ============================================ */
+
+.volume-section {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 24px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-muted);
+}
+
+.volume-icon {
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+    width: 24px;
+    text-align: center;
+}
+
+.volume-icon:hover {
+    transform: scale(1.15);
+}
+
+.volume-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-full);
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--text-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-fast);
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--text-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-value {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    min-width: 40px;
+    text-align: right;
+}
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+
+.toast-container {
+    position: fixed;
+    top: 80px;
+    right: 24px;
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    animation: slideInRight 0.3s ease;
+    pointer-events: auto;
+}
+
+.toast-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.toast.success .toast-icon {
+    background: var(--accent-subtle);
+    color: var(--accent-primary);
+}
+
+.toast.warning .toast-icon {
+    background: var(--warning-subtle);
+    color: var(--warning);
+}
+
+.toast.error .toast-icon {
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+.toast-message {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+/* ============================================
+   HOTKEYS PANEL
+   ============================================ */
+
+.hotkeys-panel {
+    position: fixed;
+    bottom: 90px;
+    right: 24px;
+    z-index: var(--z-fixed);
+    width: 280px;
+    padding: 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    display: none;
+}
+
+.hotkeys-panel.visible {
+    display: block;
+    animation: slideInUp 0.25s ease;
+}
+
+.hotkeys-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-primary);
+}
+
+.hotkeys-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.hotkey-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hotkey-action {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.hotkey-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-muted);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1100px) {
+    .main-container {
+        flex-direction: column;
+    }
+    
+    .now-playing-panel {
+        position: static;
+        width: 100%;
+        max-height: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 10px 16px;
+        gap: 12px;
+    }
+
+    .concert-timer {
+        display: none;
+    }
+
+    .logo-text {
+        font-size: 1rem;
+    }
+
+    .main-container {
+        padding: 12px 16px;
+        padding-bottom: 90px;
+    }
+
+    #timer {
+        font-size: 3rem;
+    }
+
+    .big-timer {
+        min-height: 140px;
+        padding: 20px;
+    }
+}
+
+/* ============================================
+   FULLSCREEN MODE
+   ============================================ */
+
+body.fullscreen-mode .header,
+body.fullscreen-mode .playlist-panel {
+    display: none !important;
+}
+
+body.fullscreen-mode .main-container {
+    justify-content: center;
+    align-items: center;
+    padding-bottom: 80px;
+}
+
+body.fullscreen-mode .now-playing-panel {
+    position: static;
+    width: 100%;
+    max-width: 600px;
+    max-height: none;
+}
+
+body.fullscreen-mode #timer {
+    font-size: 6rem;
+}
+
+body.fullscreen-mode .big-timer {
+    min-height: 250px;
+    padding: 50px;
+}
