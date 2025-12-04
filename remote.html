@@ -73,18 +73,17 @@
 
     <script>
     /**
-     * Mobile Remote Client
+     * Mobile Remote Client using WebSockets
      */
     class RemoteClient {
         constructor() {
-            this.channel = null;
-            this.sessionId = null;
+            this.ws = null;
             this.isConnected = false;
-            this.reconnectAttempts = 0;
-            this.maxReconnectAttempts = 5;
+            this.reconnectInterval = 5000; // 5 seconds
 
             this.cacheElements();
-            this.init();
+            this.connect();
+            this.bindEvents();
         }
 
         cacheElements() {
@@ -111,69 +110,43 @@
             };
         }
 
-        init() {
-            // Get session ID from URL
-            const params = new URLSearchParams(window.location.search);
-            this.sessionId = params.get('session');
-
-            if (!this.sessionId) {
-                this.showError('Сессия не найдена. Откройте ссылку с QR-кода.');
-                return;
-            }
-
-            this.connect();
-            this.bindEvents();
-        }
-
         connect() {
-            try {
-                this.updateStatus('connecting');
-                
-                this.channel = new BroadcastChannel(`concert-player-${this.sessionId}`);
-                
-                this.channel.onmessage = (event) => {
-                    this.handleMessage(event.data);
-                };
+            this.updateStatus('connecting');
+            const wsUrl = `ws://${window.location.host}`;
+            this.ws = new WebSocket(wsUrl);
 
-                // Send connect message
-                this.channel.postMessage({ type: 'connect' });
-
-                // Request initial state
-                setTimeout(() => {
-                    this.channel.postMessage({ type: 'get-state' });
-                }, 100);
-
+            this.ws.onopen = () => {
                 this.isConnected = true;
                 this.updateStatus('connected');
-                this.reconnectAttempts = 0;
+                this.send('get-state');
+            };
 
-            } catch (err) {
-                console.error('Connection failed:', err);
-                this.handleDisconnect();
-            }
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleMessage(data);
+                } catch (error) {
+                    console.error('Error parsing message:', error);
+                }
+            };
+
+            this.ws.onclose = () => {
+                this.isConnected = false;
+                this.updateStatus('disconnected');
+                setTimeout(() => this.connect(), this.reconnectInterval);
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.ws.close();
+            };
         }
 
         handleMessage(data) {
             if (!data) return;
 
-            switch (data.type) {
-                case 'state':
-                    this.updateUI(data);
-                    break;
-                case 'server-stopped':
-                    this.handleDisconnect();
-                    break;
-            }
-        }
-
-        handleDisconnect() {
-            this.isConnected = false;
-            this.updateStatus('disconnected');
-
-            // Try to reconnect
-            if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                this.reconnectAttempts++;
-                setTimeout(() => this.connect(), 2000);
+            if (data.type === 'state') {
+                this.updateUI(data);
             }
         }
 
@@ -192,11 +165,6 @@
                     el.textContent = '⟳ Подключение...';
                     break;
             }
-        }
-
-        showError(message) {
-            this.elements.status.textContent = message;
-            this.elements.status.className = 'connection-status disconnected';
         }
 
         updateUI(state) {
@@ -298,8 +266,8 @@
         }
 
         send(type, data = {}) {
-            if (this.channel && this.isConnected) {
-                this.channel.postMessage({ type, ...data });
+            if (this.ws && this.isConnected) {
+                this.ws.send(JSON.stringify({ type, ...data }));
             }
         }
 
