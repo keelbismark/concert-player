@@ -1,9 +1,8 @@
 /* ============================================
-   MOBILE REMOTE STYLES - ENHANCED
+   MOBILE REMOTE STYLES - ENHANCED v4.0
    ============================================ */
 
 :root {
-    /* Core colors */
     --remote-bg: #07080a;
     --remote-card: #0d1117;
     --remote-card-hover: #161b22;
@@ -11,30 +10,23 @@
     --remote-accent-dim: rgba(0, 255, 136, 0.15);
     --remote-text: #f0f6fc;
     --remote-muted: #8b949e;
-    
-    /* Additional colors */
     --remote-warning: #ffc107;
     --remote-danger: #ff3b5c;
-    --remote-purple: #a855f7;
     
-    /* Gradients */
     --gradient-accent: linear-gradient(135deg, #00ff88 0%, #00d4aa 50%, #00b894 100%);
     --gradient-danger: linear-gradient(135deg, #ff3b5c 0%, #cc2244 100%);
     --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%);
     
-    /* Glows */
-    --glow-accent: 0 0 40px rgba(0, 255, 136, 0.4), 0 0 80px rgba(0, 255, 136, 0.2);
+    --glow-accent: 0 0 40px rgba(0, 255, 136, 0.4);
     --glow-danger: 0 0 40px rgba(255, 59, 92, 0.4);
     --glow-warning: 0 0 40px rgba(255, 193, 7, 0.4);
     
-    /* Spacing */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 16px;
     --spacing-lg: 24px;
     --spacing-xl: 32px;
     
-    /* Radius */
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
@@ -63,17 +55,101 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Animated background gradient */
 body::before {
     content: '';
     position: fixed;
     inset: 0;
     background: 
         radial-gradient(ellipse 80% 50% at 20% 10%, rgba(0, 255, 136, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(168, 85, 247, 0.05) 0%, transparent 50%),
-        radial-gradient(ellipse 50% 30% at 50% 50%, rgba(0, 212, 170, 0.03) 0%, transparent 60%);
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
+}
+
+/* ===== Player Selector ===== */
+.player-selector {
+    position: fixed;
+    inset: 0;
+    background: var(--remote-bg);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.player-selector.hidden {
+    display: none;
+}
+
+.player-selector h2 {
+    margin-bottom: 24px;
+    color: var(--remote-accent);
+    font-size: 1.5rem;
+    text-align: center;
+}
+
+.player-list {
+    width: 100%;
+    max-width: 400px;
+}
+
+.player-item {
+    background: var(--remote-card);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+
+.player-item:active {
+    transform: scale(0.98);
+}
+
+.player-item.selected {
+    border-color: var(--remote-accent);
+}
+
+.player-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--remote-text);
+}
+
+.player-status {
+    font-size: 0.85rem;
+    color: var(--remote-muted);
+    margin-top: 4px;
+}
+
+.no-players {
+    text-align: center;
+    color: var(--remote-muted);
+    padding: 40px 20px;
+}
+
+.no-players p {
+    margin-bottom: 8px;
+}
+
+.refresh-btn {
+    margin-top: 20px;
+    padding: 14px 28px;
+    background: var(--remote-card);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-md);
+    color: var(--remote-text);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.refresh-btn:active {
+    transform: scale(0.95);
+    opacity: 0.8;
 }
 
 /* ===== Connection Status ===== */
@@ -129,10 +205,7 @@ body::before {
 }
 
 @keyframes slideUpHide {
-    to {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
+    to { transform: translateY(-100%); opacity: 0; }
 }
 
 @keyframes spin {
@@ -150,35 +223,26 @@ body::before {
     z-index: 1;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    min-height: 100%;
     padding: 56px var(--spacing-md) var(--spacing-md);
     padding-top: calc(56px + env(safe-area-inset-top));
     padding-bottom: max(var(--spacing-md), env(safe-area-inset-bottom));
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-/* ===== Card Base Styles ===== */
-.now-playing-card,
-.next-up-card,
-.volume-card,
-.remote-track-item {
-    background: var(--gradient-card), var(--remote-card);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    transition: all 0.2s ease;
+    gap: var(--spacing-md);
 }
 
 /* ===== Now Playing Card ===== */
 .now-playing-card {
+    background: var(--gradient-card), var(--remote-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-xl);
     padding: var(--spacing-lg);
     text-align: center;
-    margin-bottom: var(--spacing-lg);
     position: relative;
     overflow: hidden;
 }
 
-/* Decorative top line */
 .now-playing-card::before {
     content: '';
     position: absolute;
@@ -189,19 +253,6 @@ body::before {
     height: 3px;
     background: var(--gradient-accent);
     border-radius: 0 0 3px 3px;
-    opacity: 0.8;
-}
-
-/* Subtle glow effect */
-.now-playing-card::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at 50% 0%, rgba(0, 255, 136, 0.08) 0%, transparent 40%);
-    pointer-events: none;
 }
 
 .remote-track-label {
@@ -211,19 +262,15 @@ body::before {
     color: var(--remote-accent);
     margin-bottom: var(--spacing-sm);
     font-weight: 700;
-    position: relative;
-    z-index: 1;
 }
 
 .remote-track-title {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 700;
     margin-bottom: var(--spacing-xs);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    position: relative;
-    z-index: 1;
     letter-spacing: -0.5px;
 }
 
@@ -231,48 +278,81 @@ body::before {
     font-size: 0.85rem;
     color: var(--remote-warning);
     font-style: italic;
-    margin-bottom: var(--spacing-md);
-    min-height: 1.3em;
-    position: relative;
-    z-index: 1;
-    opacity: 0.9;
+    min-height: 1.2em;
+    margin-bottom: var(--spacing-sm);
 }
 
 /* ===== Timer Display ===== */
 .remote-timer {
-    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-    font-size: 4.5rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 4rem;
     font-weight: 300;
     color: var(--remote-accent);
-    text-shadow: var(--glow-accent);
     line-height: 1;
-    margin: var(--spacing-lg) 0;
-    transition: all 0.3s ease;
-    position: relative;
-    z-index: 1;
+    margin: var(--spacing-md) 0;
     letter-spacing: -2px;
+    /* Базовое свечение текста */
+    text-shadow: 
+        0 0 20px rgba(0, 255, 136, 0.5),
+        0 0 40px rgba(0, 255, 136, 0.3),
+        0 0 60px rgba(0, 255, 136, 0.2);
+    animation: remoteTimerGlow 3s ease-in-out infinite;
+}
+
+@keyframes remoteTimerGlow {
+    0%, 100% {
+        text-shadow: 
+            0 0 20px rgba(0, 255, 136, 0.5),
+            0 0 40px rgba(0, 255, 136, 0.3);
+    }
+    50% {
+        text-shadow: 
+            0 0 30px rgba(0, 255, 136, 0.7),
+            0 0 60px rgba(0, 255, 136, 0.5),
+            0 0 90px rgba(0, 255, 136, 0.3);
+    }
 }
 
 .remote-timer.warning {
     color: var(--remote-warning);
-    text-shadow: var(--glow-warning);
-    animation: timerPulse 1s ease-in-out infinite;
+    animation: remoteTimerWarning 1.5s ease-in-out infinite;
+}
+
+@keyframes remoteTimerWarning {
+    0%, 100% {
+        text-shadow: 
+            0 0 20px rgba(255, 193, 7, 0.5),
+            0 0 40px rgba(255, 193, 7, 0.3);
+        opacity: 1;
+    }
+    50% {
+        text-shadow: 
+            0 0 30px rgba(255, 193, 7, 0.8),
+            0 0 60px rgba(255, 193, 7, 0.5),
+            0 0 90px rgba(255, 193, 7, 0.3);
+        opacity: 0.9;
+    }
 }
 
 .remote-timer.critical {
     color: var(--remote-danger);
-    text-shadow: var(--glow-danger);
-    animation: timerBlink 0.4s ease-in-out infinite;
+    animation: remoteTimerCritical 0.4s ease-in-out infinite;
 }
 
-@keyframes timerPulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.85; transform: scale(0.98); }
-}
-
-@keyframes timerBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+@keyframes remoteTimerCritical {
+    0%, 100% {
+        text-shadow: 
+            0 0 20px rgba(255, 59, 92, 0.6),
+            0 0 40px rgba(255, 59, 92, 0.4);
+        opacity: 1;
+    }
+    50% {
+        text-shadow: 
+            0 0 40px rgba(255, 59, 92, 1),
+            0 0 80px rgba(255, 59, 92, 0.7),
+            0 0 120px rgba(255, 59, 92, 0.4);
+        opacity: 0.4;
+    }
 }
 
 /* ===== Progress Bar ===== */
@@ -283,7 +363,6 @@ body::before {
     overflow: visible;
     margin-top: var(--spacing-md);
     position: relative;
-    z-index: 1;
 }
 
 .remote-progress-bar {
@@ -295,31 +374,53 @@ body::before {
     box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
 }
 
-/* Progress indicator dot */
 .remote-progress-bar::after {
     content: '';
     position: absolute;
-    right: -5px;
+    right: -6px;
     top: 50%;
     transform: translateY(-50%);
     width: 14px;
     height: 14px;
     background: #fff;
     border-radius: 50%;
-    box-shadow: 0 0 10px rgba(0, 255, 136, 0.6), 0 2px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
 }
 
-/* Time Display */
 .remote-time {
     display: flex;
     justify-content: space-between;
     font-size: 0.8rem;
     color: var(--remote-muted);
-    margin-top: 12px;
+    margin-top: 10px;
     font-family: 'SF Mono', monospace;
     font-weight: 500;
-    position: relative;
-    z-index: 1;
+}
+
+/* ===== Seek Controls ===== */
+.seek-controls {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.seek-btn {
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--remote-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.seek-btn:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* ===== Main Controls ===== */
@@ -328,7 +429,6 @@ body::before {
     justify-content: center;
     align-items: center;
     gap: var(--spacing-md);
-    margin: var(--spacing-lg) 0;
     padding: var(--spacing-sm) 0;
 }
 
@@ -340,23 +440,7 @@ body::before {
     border-radius: var(--radius-full);
     cursor: pointer;
     transition: all 0.15s ease;
-    font-size: 1.5rem;
     position: relative;
-    overflow: hidden;
-}
-
-/* Ripple effect base */
-.remote-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%);
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.remote-btn:active::before {
-    opacity: 1;
 }
 
 .remote-btn:active {
@@ -364,72 +448,56 @@ body::before {
 }
 
 .remote-btn-secondary {
-    width: 60px;
-    height: 60px;
+    width: 56px;
+    height: 56px;
     background: var(--remote-card);
     color: var(--remote-text);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 1.4rem;
+    font-size: 1.3rem;
 }
 
-.remote-btn-secondary:active {
-    background: var(--remote-card-hover);
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-/* Primary Play/Stop button */
 .remote-btn-primary {
-    width: 88px;
-    height: 88px;
+    width: 80px;
+    height: 80px;
     background: var(--gradient-accent);
     color: #000;
-    font-size: 2.2rem;
+    font-size: 2rem;
     font-weight: bold;
-    box-shadow: var(--glow-accent), 0 4px 20px rgba(0,0,0,0.3);
-}
-
-.remote-btn-primary:active {
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3), 0 2px 10px rgba(0,0,0,0.3);
+    box-shadow: var(--glow-accent);
 }
 
 .remote-btn-primary.playing {
     background: var(--gradient-danger);
-    box-shadow: var(--glow-danger), 0 4px 20px rgba(0,0,0,0.3);
+    box-shadow: var(--glow-danger);
 }
 
-/* Pause button */
 .remote-btn-pause {
-    width: 60px;
-    height: 60px;
+    width: 56px;
+    height: 56px;
     background: linear-gradient(135deg, #ffc107 0%, #ff9500 100%);
     color: #000;
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     font-weight: bold;
-    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
 }
 
 .remote-btn-pause.paused {
-    background: linear-gradient(135deg, #ff9500 0%, #ff6b00 100%);
     animation: pauseGlow 1.5s ease-in-out infinite;
 }
 
 @keyframes pauseGlow {
-    0%, 100% { 
-        box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4);
-    }
-    50% { 
-        box-shadow: 0 4px 25px rgba(255, 149, 0, 0.7);
-    }
+    0%, 100% { box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4); }
+    50% { box-shadow: 0 4px 25px rgba(255, 149, 0, 0.7); }
 }
 
 /* ===== Next Up Card ===== */
 .next-up-card {
+    background: var(--gradient-card), var(--remote-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--spacing-md);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-lg);
     border-left: 3px solid var(--remote-accent);
 }
 
@@ -448,7 +516,7 @@ body::before {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 220px;
+    max-width: 200px;
 }
 
 .next-up-duration {
@@ -459,15 +527,21 @@ body::before {
     padding: 6px 12px;
     border-radius: var(--radius-sm);
     font-weight: 500;
+    flex-shrink: 0;
+    margin-left: var(--spacing-sm);
 }
 
 /* ===== Playlist ===== */
 .remote-playlist {
     flex: 1;
-    min-height: 0;
+    min-height: 150px;
     display: flex;
     flex-direction: column;
-    margin-bottom: var(--spacing-md);
+    background: var(--gradient-card), var(--remote-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    overflow: hidden;
 }
 
 .remote-playlist-header {
@@ -475,13 +549,12 @@ body::before {
     justify-content: space-between;
     align-items: center;
     margin-bottom: var(--spacing-md);
-    padding: 0 var(--spacing-xs);
+    flex-shrink: 0;
 }
 
 .remote-playlist-title {
     font-size: 0.95rem;
     font-weight: 700;
-    letter-spacing: 0.3px;
 }
 
 .remote-playlist-count {
@@ -497,19 +570,13 @@ body::before {
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding-right: 4px;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
 }
 
-/* Custom scrollbar */
 #remote-playlist-items::-webkit-scrollbar {
     width: 4px;
-}
-
-#remote-playlist-items::-webkit-scrollbar-track {
-    background: transparent;
 }
 
 #remote-playlist-items::-webkit-scrollbar-thumb {
@@ -517,72 +584,55 @@ body::before {
     border-radius: 4px;
 }
 
-#remote-playlist-items::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
-}
-
-/* Track items */
 .remote-track-item {
     display: flex;
     align-items: center;
-    padding: 14px 16px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.02);
     border-radius: var(--radius-md);
     cursor: pointer;
     border-left: 3px solid transparent;
     flex-shrink: 0;
+    transition: all 0.15s;
 }
 
 .remote-track-item:active {
     transform: scale(0.98);
-    background: var(--remote-card-hover);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .remote-track-item.current {
     border-left-color: var(--remote-accent);
-    background: rgba(0, 255, 136, 0.06);
-    border: 1px solid rgba(0, 255, 136, 0.15);
-    border-left: 3px solid var(--remote-accent);
+    background: rgba(0, 255, 136, 0.08);
 }
 
 .remote-track-item.current.playing {
-    box-shadow: 0 0 25px rgba(0, 255, 136, 0.15);
     animation: playingGlow 2s ease-in-out infinite;
 }
 
 @keyframes playingGlow {
-    0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.1); }
-    50% { box-shadow: 0 0 30px rgba(0, 255, 136, 0.2); }
+    0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 136, 0.1); }
+    50% { box-shadow: 0 0 25px rgba(0, 255, 136, 0.2); }
 }
 
 .remote-track-number {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-sm);
-    margin-right: 14px;
-    font-size: 0.8rem;
+    margin-right: 12px;
+    font-size: 0.75rem;
     font-weight: 700;
     color: var(--remote-muted);
     flex-shrink: 0;
-    transition: all 0.2s;
 }
 
 .remote-track-item.current .remote-track-number {
     background: var(--remote-accent);
     color: #000;
-    box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
-}
-
-.remote-track-item.current.playing .remote-track-number {
-    animation: numberPulse 1s ease-in-out infinite;
-}
-
-@keyframes numberPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
 }
 
 .remote-track-info {
@@ -591,42 +641,40 @@ body::before {
 }
 
 .remote-track-name {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 2px;
 }
 
 .remote-track-duration {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--remote-muted);
     font-family: 'SF Mono', monospace;
-    font-weight: 500;
+    margin-top: 2px;
 }
 
 /* ===== Volume Control ===== */
 .volume-card {
+    background: var(--gradient-card), var(--remote-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-md) var(--spacing-lg);
+    padding: var(--spacing-md);
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    margin-top: auto;
+    flex-shrink: 0;
 }
 
 .volume-icon {
-    font-size: 1.4rem;
-    width: 32px;
+    font-size: 1.3rem;
+    width: 28px;
     text-align: center;
-    transition: transform 0.2s;
 }
 
 .volume-slider-container {
     flex: 1;
-    position: relative;
-    padding: 10px 0;
 }
 
 .volume-slider {
@@ -642,28 +690,21 @@ body::before {
 
 .volume-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
-    background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
+    width: 20px;
+    height: 20px;
+    background: #fff;
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.volume-slider::-webkit-slider-thumb:active {
-    transform: scale(1.15);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
 }
 
 .volume-slider::-moz-range-thumb {
-    width: 22px;
-    height: 22px;
-    background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
+    width: 20px;
+    height: 20px;
+    background: #fff;
     border-radius: 50%;
     cursor: pointer;
     border: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .volume-value {
@@ -675,116 +716,107 @@ body::before {
     font-weight: 600;
 }
 
-/* ===== QR Code Modal ===== */
-.qr-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.92);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    padding: var(--spacing-lg);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-.qr-modal.active {
-    display: flex;
-    animation: fadeIn 0.25s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.qr-content {
-    background: var(--gradient-card), var(--remote-card);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-xl);
-    padding: var(--spacing-xl);
-    text-align: center;
-    max-width: 350px;
-    width: 100%;
-    animation: scaleIn 0.3s ease;
-}
-
-@keyframes scaleIn {
-    from { transform: scale(0.9); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-.qr-title {
-    font-size: 1.3rem;
-    font-weight: 700;
-    margin-bottom: var(--spacing-sm);
-}
-
-.qr-subtitle {
-    font-size: 0.9rem;
+/* ===== Connection Info ===== */
+.connection-info {
+    font-size: 0.75rem;
     color: var(--remote-muted);
-    margin-bottom: var(--spacing-lg);
+    text-align: center;
+    min-height: 1em;
+    flex-shrink: 0;
 }
 
-.qr-code {
-    background: white;
-    padding: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    margin-bottom: var(--spacing-lg);
-    display: inline-block;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-}
-
-.qr-url {
-    font-family: 'SF Mono', monospace;
-    font-size: 0.85rem;
-    color: var(--remote-accent);
-    word-break: break-all;
-    margin-bottom: var(--spacing-lg);
-    background: var(--remote-accent-dim);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-sm);
-}
-
-.qr-close {
-    padding: 14px 40px;
-    background: var(--gradient-accent);
-    color: #000;
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s;
-    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
-}
-
-.qr-close:active {
-    transform: scale(0.95);
-}
-
-/* ===== Responsive ===== */
+/* ===== Responsive - Small screens ===== */
 @media (max-width: 360px) {
     .remote-timer {
-        font-size: 3.5rem;
+        font-size: 3rem;
     }
     
     .remote-track-title {
-        font-size: 1.25rem;
+        font-size: 1.2rem;
     }
     
     .remote-btn-primary {
-        width: 76px;
-        height: 76px;
-        font-size: 1.8rem;
+        width: 70px;
+        height: 70px;
+        font-size: 1.7rem;
     }
     
     .remote-btn-secondary,
     .remote-btn-pause {
-        width: 52px;
-        height: 52px;
-        font-size: 1.2rem;
+        width: 50px;
+        height: 50px;
+        font-size: 1.1rem;
+    }
+    
+    .seek-btn {
+        padding: 8px 10px;
+        font-size: 0.75rem;
+    }
+}
+
+/* ===== Landscape Mode ===== */
+@media (orientation: landscape) and (max-height: 500px) {
+    .remote-container {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        align-content: flex-start;
+        padding-top: 50px;
+        gap: 10px;
+    }
+    
+    .now-playing-card {
+        width: calc(55% - 5px);
+        padding: 14px;
+    }
+    
+    .remote-controls {
+        width: calc(45% - 5px);
+        padding: 10px 0;
+        flex-wrap: wrap;
+    }
+    
+    .remote-timer {
+        font-size: 2.2rem;
+        margin: 8px 0;
+    }
+    
+    .seek-controls {
+        margin-top: 8px;
+    }
+    
+    .seek-btn {
+        padding: 6px 10px;
+        font-size: 0.7rem;
+    }
+    
+    .next-up-card {
+        width: calc(55% - 5px);
+        padding: 12px;
+    }
+    
+    .remote-playlist {
+        width: calc(45% - 5px);
+        min-height: 100px;
+        max-height: 35vh;
+    }
+    
+    .volume-card {
+        width: 100%;
+        padding: 12px;
+    }
+    
+    .remote-btn-primary {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+    }
+    
+    .remote-btn-secondary,
+    .remote-btn-pause {
+        width: 45px;
+        height: 45px;
+        font-size: 1rem;
     }
 }
 
@@ -794,7 +826,7 @@ body::before {
 .next-up-card,
 .remote-playlist,
 .volume-card {
-    animation: slideUp 0.5s ease backwards;
+    animation: slideUp 0.4s ease backwards;
 }
 
 .now-playing-card { animation-delay: 0.05s; }

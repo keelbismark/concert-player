@@ -7,180 +7,240 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// ✅ Правильное хранение клиентов
-let mainAppWs = null;
-const remoteClients = new Set();
+// Multi-room: Хранение нескольких плееров
+const players = new Map();
+const remotes = new Map();
 
-// Serve static files
+// Отключаем кэш для HTML
+app.use((req, res, next) => {
+    if (req.url.endsWith('.html')) {
+        res.set('Cache-Control', 'no-store');
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, '/')));
 
-// WebSocket connection handler
 wss.on('connection', (ws) => {
-    console.log('📡 New client connected, waiting for identification...');
+    console.log('📡 New client connected');
     
     ws.isAlive = true;
-    ws.clientType = null; // Пока не идентифицирован
+    ws.clientType = null;
+    ws.playerId = null;
 
     ws.on('message', (message) => {
         try {
-            const data = JSON.parse(message.toString());
+            const messageStr = message.toString();
+            const data = JSON.parse(messageStr);
             
-            // ✅ Обработка идентификации — КРИТИЧЕСКИ ВАЖНО
+            if (data.type === 'ping') {
+                ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+                return;
+            }
+            
             if (data.type === 'identify') {
                 handleIdentification(ws, data);
                 return;
             }
+            
+            if (data.type === 'get-players') {
+                sendPlayerList(ws);
+                return;
+            }
+            
+            if (data.type === 'select-player') {
+                handlePlayerSelection(ws, data);
+                return;
+            }
 
-            // ✅ Маршрутизация на основе типа клиента
-            routeMessage(ws, message, data);
+            routeMessage(ws, messageStr, data);
 
         } catch (error) {
-            console.error('Error parsing message:', error);
+            console.error('Parse error:', error.message);
         }
     });
 
-    ws.on('close', () => {
-        handleDisconnection(ws);
-    });
-
-    ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-    });
-
-    ws.on('pong', () => {
-        ws.isAlive = true;
-    });
+    ws.on('close', () => handleDisconnection(ws));
+    ws.on('pong', () => { ws.isAlive = true; });
 });
 
-/**
- * Handle client identification
- */
 function handleIdentification(ws, data) {
-    const { clientType } = data;
-
-    if (clientType === 'main-app') {
-        // Если уже есть другой main-app — отключаем старый
-        if (mainAppWs && mainAppWs !== ws && mainAppWs.readyState === WebSocket.OPEN) {
-            console.log('⚠️  Replacing existing main app connection');
-            mainAppWs.clientType = null;
-        }
+    if (data.clientType === 'main-app') {
+        const playerId = data.playerId || `player-${Date.now()}`;
+        const playerName = data.playerName || `Player ${players.size + 1}`;
         
-        mainAppWs = ws;
         ws.clientType = 'main-app';
-        console.log('✅ Main application identified and registered');
-
-        // Если есть ожидающие пульты — запросить состояние
-        if (remoteClients.size > 0) {
-            console.log(`📤 Requesting state for ${remoteClients.size} waiting remote(s)`);
+        ws.playerId = playerId;
+        
+        players.set(playerId, {
+            ws,
+            name: playerName,
+            state: null,
+            connectedAt: Date.now()
+        });
+        
+        console.log(`✅ Player registered: ${playerName} (${playerId})`);
+        
+        ws.send(JSON.stringify({ 
+            type: 'registered', 
+            playerId,
+            playerName 
+        }));
+        
+        broadcastPlayerList();
+        
+        const connectedRemotes = getRemotesForPlayer(playerId);
+        if (connectedRemotes.length > 0) {
             ws.send(JSON.stringify({ type: 'get-state' }));
         }
 
-    } else if (clientType === 'remote') {
-        remoteClients.add(ws);
+    } else if (data.clientType === 'remote') {
         ws.clientType = 'remote';
-        console.log(`✅ Remote client registered (total: ${remoteClients.size})`);
-
-        // Если плеер уже подключён — запросить состояние
-        if (mainAppWs && mainAppWs.readyState === WebSocket.OPEN) {
-            console.log('📤 Requesting state for new remote');
-            mainAppWs.send(JSON.stringify({ type: 'get-state' }));
-        } else {
-            // Уведомить пульт что плеер офлайн
-            ws.send(JSON.stringify({ 
-                type: 'status', 
-                status: 'waiting',
-                message: 'Ожидание подключения плеера...'
-            }));
-        }
-
-    } else {
-        console.warn('⚠️  Unknown client type:', clientType);
+        
+        remotes.set(ws, {
+            playerId: null,
+            connectedAt: Date.now()
+        });
+        
+        console.log(`✅ Remote connected (total: ${remotes.size})`);
+        sendPlayerList(ws);
     }
 }
 
-/**
- * Route messages between clients
- */
-function routeMessage(ws, rawMessage, data) {
-    if (ws.clientType === 'main-app') {
-        // Сообщение от плеера → всем пультам
-        broadcastToRemotes(rawMessage);
-        
-    } else if (ws.clientType === 'remote') {
-        // Команда от пульта → плееру
-        sendToMainApp(rawMessage);
-        
-    } else {
-        // Неидентифицированный клиент
-        console.warn('⚠️  Message from unidentified client ignored:', data.type);
+function handlePlayerSelection(ws, data) {
+    const { playerId } = data;
+    const remote = remotes.get(ws);
+    
+    if (!remote) return;
+    
+    const player = players.get(playerId);
+    
+    if (!player) {
         ws.send(JSON.stringify({ 
             type: 'error', 
-            message: 'Please identify first' 
+            message: 'Player not found' 
         }));
+        return;
+    }
+    
+    remote.playerId = playerId;
+    console.log(`📱 Remote connected to player: ${player.name}`);
+    
+    ws.send(JSON.stringify({ 
+        type: 'player-selected',
+        playerId,
+        playerName: player.name
+    }));
+    
+    if (player.ws.readyState === WebSocket.OPEN) {
+        player.ws.send(JSON.stringify({ type: 'get-state' }));
     }
 }
 
-/**
- * Broadcast message to all remote clients
- */
-function broadcastToRemotes(message) {
-    let sent = 0;
-    remoteClients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(message);
-            sent++;
+function sendPlayerList(ws) {
+    const playerList = Array.from(players.entries()).map(([id, player]) => ({
+        id,
+        name: player.name,
+        hasState: player.state !== null
+    }));
+    
+    ws.send(JSON.stringify({
+        type: 'player-list',
+        players: playerList
+    }));
+}
+
+function broadcastPlayerList() {
+    const playerList = Array.from(players.entries()).map(([id, player]) => ({
+        id,
+        name: player.name,
+        hasState: player.state !== null
+    }));
+    
+    const message = JSON.stringify({
+        type: 'player-list',
+        players: playerList
+    });
+    
+    remotes.forEach((remote, ws) => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(message);
         }
     });
-    if (sent > 0) {
-        // console.log(`📡 Broadcasted to ${sent} remote(s)`);
+}
+
+function getRemotesForPlayer(playerId) {
+    const result = [];
+    remotes.forEach((remote, ws) => {
+        if (remote.playerId === playerId && ws.readyState === WebSocket.OPEN) {
+            result.push(ws);
+        }
+    });
+    return result;
+}
+
+function routeMessage(ws, messageStr, data) {
+    if (ws.clientType === 'main-app') {
+        if (data.type === 'state') {
+            const player = players.get(ws.playerId);
+            if (player) {
+                player.state = data;
+            }
+        }
+        
+        const targetRemotes = getRemotesForPlayer(ws.playerId);
+        targetRemotes.forEach(remoteWs => {
+            remoteWs.send(messageStr);
+        });
+        
+    } else if (ws.clientType === 'remote') {
+        const remote = remotes.get(ws);
+        if (!remote || !remote.playerId) {
+            ws.send(JSON.stringify({ 
+                type: 'error', 
+                message: 'No player selected' 
+            }));
+            return;
+        }
+        
+        console.log(`📱 Remote command: ${data.type}`);
+        
+        const player = players.get(remote.playerId);
+        if (player && player.ws.readyState === WebSocket.OPEN) {
+            player.ws.send(messageStr);
+        }
     }
 }
 
-/**
- * Send message to main app
- */
-function sendToMainApp(message) {
-    if (mainAppWs && mainAppWs.readyState === WebSocket.OPEN) {
-        mainAppWs.send(message);
-    } else {
-        console.warn('⚠️  Main app not connected, cannot forward command');
-    }
-}
-
-/**
- * Handle client disconnection
- */
 function handleDisconnection(ws) {
     if (ws.clientType === 'main-app') {
-        console.log('❌ Main application disconnected');
-        mainAppWs = null;
+        const player = players.get(ws.playerId);
+        console.log(`❌ Player disconnected: ${player?.name || ws.playerId}`);
         
-        // Уведомить все пульты
-        const notification = JSON.stringify({ 
-            type: 'status', 
-            status: 'player-disconnected',
-            message: 'Плеер отключился'
-        });
-        remoteClients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(notification);
+        players.delete(ws.playerId);
+        
+        remotes.forEach((remote, remoteWs) => {
+            if (remote.playerId === ws.playerId && remoteWs.readyState === WebSocket.OPEN) {
+                remoteWs.send(JSON.stringify({ 
+                    type: 'player-disconnected',
+                    message: 'Плеер отключился'
+                }));
+                remote.playerId = null;
             }
         });
+        
+        broadcastPlayerList();
 
     } else if (ws.clientType === 'remote') {
-        remoteClients.delete(ws);
-        console.log(`❌ Remote disconnected (remaining: ${remoteClients.size})`);
-
-    } else {
-        console.log('❌ Unidentified client disconnected');
+        remotes.delete(ws);
+        console.log(`❌ Remote disconnected (remaining: ${remotes.size})`);
     }
 }
 
-// Ping interval to detect dead connections
-const pingInterval = setInterval(() => {
-    wss.clients.forEach((ws) => {
+setInterval(() => {
+    wss.clients.forEach(ws => {
         if (!ws.isAlive) {
-            console.log('🔌 Terminating inactive connection');
+            console.log('🔌 Terminating dead connection');
             return ws.terminate();
         }
         ws.isAlive = false;
@@ -188,24 +248,15 @@ const pingInterval = setInterval(() => {
     });
 }, 30000);
 
-wss.on('close', () => {
-    clearInterval(pingInterval);
-});
-
-// Start server
 const port = process.env.PORT || 3000;
 server.listen(port, () => {
     console.log(`
-╔════════════════════════════════════════════════════════╗
-║         🎵 Concert Player Server Started 🎵            ║
-╠════════════════════════════════════════════════════════╣
-║                                                        ║
-║  Player:  http://localhost:${port}                        ║
-║  Remote:  http://localhost:${port}/remote.html            ║
-║                                                        ║
-║  On your network:                                      ║
-║  Remote:  http://<your-ip>:${port}/remote.html            ║
-║                                                        ║
-╚════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════╗
+║   🎵 Concert Player Server v4.0            ║
+║      Multi-room Edition                    ║
+╠════════════════════════════════════════════╣
+║  Player: http://localhost:${port}              ║
+║  Remote: http://localhost:${port}/remote.html  ║
+╚════════════════════════════════════════════╝
     `);
 });

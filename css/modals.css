@@ -320,3 +320,210 @@
     font-size: 0.8em;
     color: var(--text-muted);
 }
+
+/* ============================================
+   QR CODE MODAL
+   ============================================ */
+
+.qr-modal {
+    max-width: 360px;
+}
+
+.qr-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 28px 24px;
+    gap: 20px;
+}
+
+/* QR Container */
+.qr-container {
+    position: relative;
+    padding: 20px;
+    background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 24px;
+    box-shadow: 
+        0 16px 48px rgba(0, 0, 0, 0.35),
+        inset 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* Animated glow */
+.qr-glow {
+    position: absolute;
+    inset: -20px;
+    background: conic-gradient(
+        from 0deg,
+        rgba(0, 255, 136, 0.4),
+        rgba(0, 212, 170, 0.2),
+        rgba(168, 85, 247, 0.25),
+        rgba(0, 255, 136, 0.4)
+    );
+    border-radius: 44px;
+    filter: blur(25px);
+    z-index: -1;
+    opacity: 0.6;
+    animation: qrGlow 6s linear infinite;
+}
+
+@keyframes qrGlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* QR Canvas */
+#qr-canvas {
+    display: block;
+    width: 200px;
+    height: 200px;
+    border-radius: 16px;
+}
+
+/* Scan line */
+.qr-container::after {
+    content: '';
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(0, 255, 136, 0.7), 
+        transparent
+    );
+    border-radius: 2px;
+    animation: scanLine 2.5s ease-in-out infinite;
+}
+
+@keyframes scanLine {
+    0%, 100% { top: 20px; opacity: 0; }
+    5%, 95% { opacity: 0.7; }
+    50% { top: calc(100% - 22px); }
+}
+
+/* Instruction */
+.qr-instruction {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+/* URL Container */
+.qr-url-container {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+}
+
+.qr-url-container input {
+    flex: 1;
+    padding: 12px 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    color: var(--accent-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.qr-url-container input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+/* Copy Button */
+.copy-btn {
+    width: 48px;
+    height: 48px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.copy-btn:hover {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+.copy-btn.copied {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+/* Open Button */
+.qr-open-btn {
+    width: 100%;
+    padding: 14px 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.qr-open-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+}
+
+/* Status */
+.qr-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    border-radius: 30px;
+    font-size: 0.85rem;
+    color: var(--accent-primary);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent-primary);
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Closing animation */
+.modal-overlay.closing {
+    animation: fadeOut 0.2s ease forwards;
+}
+
+.modal-overlay.closing .modal {
+    animation: modalOut 0.2s ease forwards;
+}
+
+@keyframes fadeOut {
+    to { opacity: 0; }
+}
+
+@keyframes modalOut {
+    to { 
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+}

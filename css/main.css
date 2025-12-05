@@ -180,7 +180,8 @@ body::before {
     }
 }
 
-@keyframes glow-pulse {
+/* Свечение для КОНТЕЙНЕРОВ (box-shadow) */
+@keyframes glow-pulse-box {
     0%, 100% {
         box-shadow: 0 0 15px var(--accent-glow);
     }
@@ -189,10 +190,56 @@ body::before {
     }
 }
 
+/* Свечение для ТЕКСТА (text-shadow) - зелёный */
+@keyframes glow-pulse-text {
+    0%, 100% {
+        text-shadow: 
+            0 0 10px var(--accent-glow),
+            0 0 20px var(--accent-glow);
+    }
+    50% {
+        text-shadow: 
+            0 0 20px var(--accent-glow),
+            0 0 40px var(--accent-glow),
+            0 0 60px var(--accent-glow);
+    }
+}
+
+/* Свечение для ТЕКСТА - жёлтый (warning) */
+@keyframes glow-pulse-text-warning {
+    0%, 100% {
+        text-shadow: 
+            0 0 10px var(--warning-glow),
+            0 0 20px var(--warning-glow);
+    }
+    50% {
+        text-shadow: 
+            0 0 20px var(--warning-glow),
+            0 0 40px var(--warning-glow),
+            0 0 60px var(--warning-glow);
+    }
+}
+
+/* Свечение для ТЕКСТА - красный (danger) */
+@keyframes glow-pulse-text-danger {
+    0%, 100% {
+        text-shadow: 
+            0 0 10px var(--danger-glow),
+            0 0 20px var(--danger-glow);
+    }
+    50% {
+        text-shadow: 
+            0 0 20px var(--danger-glow),
+            0 0 40px var(--danger-glow),
+            0 0 60px var(--danger-glow);
+    }
+}
+
 @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
 }
+
 
 @keyframes spin {
     to { transform: rotate(360deg); }
