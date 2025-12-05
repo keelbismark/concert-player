@@ -39,7 +39,7 @@
             
             <div class="remote-timer" id="remote-timer">--:--</div>
             
-            <!-- Position indicator for stopped state -->
+            <!-- Position indicator for stopped/paused state -->
             <div class="position-indicator" id="position-indicator"></div>
             
             <div class="remote-progress">
@@ -58,12 +58,12 @@
             </div>
         </div>
 
-        <!-- Controls -->
+        <!-- Controls - УПРОЩЁННЫЕ -->
         <div class="remote-controls">
-            <button class="remote-btn remote-btn-secondary" id="remote-prev">⏮</button>
-            <button class="remote-btn remote-btn-pause" id="remote-pause">⏸</button>
-            <button class="remote-btn remote-btn-primary" id="remote-play">▶</button>
-            <button class="remote-btn remote-btn-secondary" id="remote-next">⏭</button>
+            <button class="remote-btn remote-btn-secondary" id="remote-prev" title="Предыдущий">⏮</button>
+            <button class="remote-btn remote-btn-stop" id="remote-stop" title="Стоп">⏹</button>
+            <button class="remote-btn remote-btn-primary" id="remote-play" title="Play/Pause">▶</button>
+            <button class="remote-btn remote-btn-secondary" id="remote-next" title="Следующий">⏭</button>
         </div>
 
         <!-- Next Up -->
@@ -114,7 +114,6 @@
             this.targetPlayerId = this.getPlayerIdFromUrl();
             
             console.log('🎮 Remote initialized');
-            console.log('Target player from URL:', this.targetPlayerId || 'none');
 
             this.cacheElements();
             this.bindEvents();
@@ -122,9 +121,20 @@
         }
 
         getPlayerIdFromUrl() {
+            // 1. Проверяем путь /remote/player-xxx
+            const pathMatch = window.location.pathname.match(/\/remote\/(.+)/);
+            if (pathMatch && pathMatch[1]) {
+                return decodeURIComponent(pathMatch[1]);
+            }
+            
+            // 2. Проверяем query параметр ?player=xxx
             const params = new URLSearchParams(window.location.search);
             const playerId = params.get('player');
-            return playerId ? decodeURIComponent(playerId) : null;
+            if (playerId) {
+                return decodeURIComponent(playerId);
+            }
+            
+            return null;
         }
 
         cacheElements() {
@@ -141,7 +151,7 @@
                 timeCurrent: document.getElementById('remote-time-current'),
                 timeTotal: document.getElementById('remote-time-total'),
                 playBtn: document.getElementById('remote-play'),
-                pauseBtn: document.getElementById('remote-pause'),
+                stopBtn: document.getElementById('remote-stop'),
                 prevBtn: document.getElementById('remote-prev'),
                 nextBtn: document.getElementById('remote-next'),
                 seekBack30: document.getElementById('seek-back-30'),
@@ -156,7 +166,6 @@
                 volumeSlider: document.getElementById('remote-volume'),
                 volumeValue: document.getElementById('remote-volume-value'),
                 volumeIcon: document.getElementById('remote-volume-icon'),
-                // New status elements
                 playbackStatus: document.getElementById('playback-status'),
                 statusIcon: document.getElementById('status-icon'),
                 statusText: document.getElementById('status-text'),
@@ -169,8 +178,6 @@
             this.updateStatus('connecting');
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}`;
-            
-            console.log('Connecting to:', wsUrl);
             
             try {
                 this.ws = new WebSocket(wsUrl);
@@ -203,16 +210,13 @@
             };
 
             this.ws.onclose = (event) => {
-                console.log('WebSocket closed:', event.code);
                 this.isConnected = false;
                 this.stopHeartbeat();
                 this.updateStatus('disconnected');
                 this.scheduleReconnect();
             };
 
-            this.ws.onerror = (err) => {
-                console.error('WebSocket error');
-            };
+            this.ws.onerror = () => console.error('WebSocket error');
         }
 
         scheduleReconnect() {
@@ -231,7 +235,6 @@
             this.heartbeatInterval = setInterval(() => {
                 if (this.ws?.readyState === WebSocket.OPEN) {
                     if (Date.now() - this.lastPong > 35000) {
-                        console.log('Heartbeat timeout');
                         this.ws.close();
                         return;
                     }
@@ -254,34 +257,24 @@
                 case 'pong':
                     this.lastPong = Date.now();
                     break;
-                    
                 case 'player-list':
                     this.handlePlayerList(data.players);
                     break;
-                    
                 case 'player-selected':
                     this.selectedPlayerId = data.playerId;
                     this.selectedPlayerName = data.playerName;
                     this.hidePlayerSelector();
                     this.elements.connectionInfo.textContent = `🎵 ${data.playerName}`;
-                    console.log('✅ Connected to player:', data.playerName);
                     break;
-                    
                 case 'player-disconnected':
-                    console.log('Player disconnected');
                     this.selectedPlayerId = null;
-                    this.selectedPlayerName = null;
                     this.showPlayerSelector();
                     this.updateStatus('disconnected');
-                    this.elements.status.textContent = data.message || 'Плеер отключился';
                     setTimeout(() => this.send('get-players'), 1000);
                     break;
-                    
                 case 'error':
-                    console.error('Server error:', data.message);
                     this.elements.connectionInfo.textContent = '⚠️ ' + data.message;
                     break;
-                    
                 case 'state':
                     this.updateUI(data);
                     break;
@@ -290,7 +283,6 @@
 
         handlePlayerList(players) {
             this.players = players;
-            console.log('Player list:', players.length, 'players');
             
             if (!players.length) {
                 this.elements.playerList.innerHTML = `
@@ -308,40 +300,25 @@
             if (this.targetPlayerId && !this.selectedPlayerId) {
                 const targetPlayer = players.find(p => p.id === this.targetPlayerId);
                 if (targetPlayer) {
-                    console.log('🎯 Auto-connecting to target player:', targetPlayer.name);
                     this.selectPlayer(targetPlayer.id);
                     return;
-                } else {
-                    console.warn('Target player not found:', this.targetPlayerId);
-                    this.elements.connectionInfo.textContent = '⚠️ Целевой плеер не найден';
                 }
             }
             
-            if (players.length === 1 && !this.selectedPlayerId && !this.targetPlayerId) {
-                console.log('Auto-selecting single player:', players[0].name);
+            if (players.length === 1 && !this.selectedPlayerId) {
                 this.selectPlayer(players[0].id);
                 return;
             }
             
-            if (this.selectedPlayerId) {
-                const stillExists = players.find(p => p.id === this.selectedPlayerId);
-                if (stillExists) {
-                    this.hidePlayerSelector();
-                    return;
-                } else {
-                    this.selectedPlayerId = null;
-                    this.selectedPlayerName = null;
-                }
+            if (this.selectedPlayerId && players.find(p => p.id === this.selectedPlayerId)) {
+                this.hidePlayerSelector();
+                return;
             }
             
             this.elements.playerList.innerHTML = players.map(p => `
-                <div class="player-item ${p.id === this.selectedPlayerId ? 'selected' : ''}" 
-                     data-player-id="${p.id}">
+                <div class="player-item" data-player-id="${p.id}">
                     <div class="player-name">🎵 ${p.name}</div>
-                    <div class="player-status">${p.hasState ? '● Воспроизведение' : '○ Готов'}</div>
-                    <div style="font-size: 0.65rem; opacity: 0.4; margin-top: 4px; font-family: monospace;">
-                        ${p.id.slice(-12)}
-                    </div>
+                    <div class="player-status">${p.hasState ? '● Активен' : '○ Готов'}</div>
                 </div>
             `).join('');
             
@@ -356,7 +333,6 @@
         }
 
         selectPlayer(id) {
-            console.log('Selecting player:', id);
             this.send('select-player', { playerId: id });
         }
 
@@ -375,85 +351,37 @@
                             status === 'disconnected' ? '✕ Отключено' : '⟳ Подключение...';
         }
 
-        /**
-         * Determine playback state
-         */
         getPlaybackState(isPlaying, isPaused, currentTime, duration) {
-            if (isPlaying && !isPaused) {
-                return 'playing';
-            }
-            if (isPaused) {
-                return 'paused';
-            }
-            if (duration > 0 && currentTime >= duration - 0.5) {
-                return 'finished';
-            }
-            if (currentTime > 0.5 && duration > 0) {
-                return 'stopped'; // Остановлено с сохранённой позицией
-            }
+            if (isPlaying && !isPaused) return 'playing';
+            if (isPaused) return 'paused';
+            if (duration > 0 && currentTime >= duration - 0.5) return 'finished';
+            if (currentTime > 0.5 && duration > 0) return 'stopped';
             return 'ready';
         }
 
-        /**
-         * Update playback status indicator
-         */
-        updatePlaybackStatus(state, currentTime, duration) {
+        updatePlaybackStatus(state, currentTime) {
             const { statusIcon, statusText, playbackStatus, positionIndicator, nowPlayingCard, timer } = this.elements;
             
-            // Remove all state classes
             playbackStatus.className = 'playback-status';
             nowPlayingCard.classList.remove('state-playing', 'state-paused', 'state-stopped', 'state-finished', 'state-ready');
             timer.classList.remove('playing', 'paused', 'stopped', 'finished');
             
-            switch (state) {
-                case 'playing':
-                    statusIcon.textContent = '▶';
-                    statusText.textContent = 'Воспроизведение';
-                    playbackStatus.classList.add('status-playing');
-                    nowPlayingCard.classList.add('state-playing');
-                    timer.classList.add('playing');
-                    positionIndicator.textContent = '';
-                    positionIndicator.style.display = 'none';
-                    break;
-                    
-                case 'paused':
-                    statusIcon.textContent = '⏸';
-                    statusText.textContent = 'Пауза';
-                    playbackStatus.classList.add('status-paused');
-                    nowPlayingCard.classList.add('state-paused');
-                    timer.classList.add('paused');
-                    positionIndicator.textContent = `Позиция: ${this.formatTime(currentTime)}`;
-                    positionIndicator.style.display = 'block';
-                    break;
-                    
-                case 'stopped':
-                    statusIcon.textContent = '⏹';
-                    statusText.textContent = 'Остановлено';
-                    playbackStatus.classList.add('status-stopped');
-                    nowPlayingCard.classList.add('state-stopped');
-                    timer.classList.add('stopped');
-                    positionIndicator.textContent = `▶ Продолжить с ${this.formatTime(currentTime)}`;
-                    positionIndicator.style.display = 'block';
-                    break;
-                    
-                case 'finished':
-                    statusIcon.textContent = '✓';
-                    statusText.textContent = 'Завершён';
-                    playbackStatus.classList.add('status-finished');
-                    nowPlayingCard.classList.add('state-finished');
-                    timer.classList.add('finished');
-                    positionIndicator.textContent = '';
-                    positionIndicator.style.display = 'none';
-                    break;
-                    
-                default: // ready
-                    statusIcon.textContent = '○';
-                    statusText.textContent = 'Готов';
-                    playbackStatus.classList.add('status-ready');
-                    nowPlayingCard.classList.add('state-ready');
-                    positionIndicator.textContent = '';
-                    positionIndicator.style.display = 'none';
-            }
+            const states = {
+                playing: { icon: '▶', text: 'Воспроизведение', position: '' },
+                paused: { icon: '⏸', text: 'Пауза', position: `Позиция: ${this.formatTime(currentTime)}` },
+                stopped: { icon: '⏹', text: 'Остановлено', position: `▶ Продолжить с ${this.formatTime(currentTime)}` },
+                finished: { icon: '✓', text: 'Завершён', position: '' },
+                ready: { icon: '○', text: 'Готов', position: '' }
+            };
+            
+            const s = states[state] || states.ready;
+            statusIcon.textContent = s.icon;
+            statusText.textContent = s.text;
+            playbackStatus.classList.add(`status-${state}`);
+            nowPlayingCard.classList.add(`state-${state}`);
+            timer.classList.add(state);
+            positionIndicator.textContent = s.position;
+            positionIndicator.style.display = s.position ? 'block' : 'none';
         }
 
         updateUI(state) {
@@ -464,9 +392,8 @@
                 volume, playlist, playlistLength, isPlaying, isPaused 
             } = state;
 
-            // Determine and update playback state
             const playbackState = this.getPlaybackState(isPlaying, isPaused, currentTime, duration);
-            this.updatePlaybackStatus(playbackState, currentTime, duration);
+            this.updatePlaybackStatus(playbackState, currentTime);
 
             // Track info
             this.elements.trackTitle.textContent = currentTrack?.title || '—';
@@ -478,46 +405,39 @@
             this.elements.timer.textContent = this.formatTime(remaining);
             this.elements.timeCurrent.textContent = this.formatTime(currentTime);
             
-            // Warning classes for timer (only when playing)
+            // Warning classes
             this.elements.timer.classList.remove('warning', 'critical');
             if (isPlaying && !isPaused && remaining > 0) {
-                if (remaining <= 5) {
-                    this.elements.timer.classList.add('critical');
-                } else if (remaining <= 15) {
-                    this.elements.timer.classList.add('warning');
-                }
+                if (remaining <= 5) this.elements.timer.classList.add('critical');
+                else if (remaining <= 15) this.elements.timer.classList.add('warning');
             }
 
             // Progress
             const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
             this.elements.progress.style.width = `${progress}%`;
 
-            // Play button - changes based on state
-            if (isPlaying) {
-                this.elements.playBtn.innerHTML = '⏹';
-                this.elements.playBtn.classList.add('playing');
-                this.elements.playBtn.title = 'Стоп';
-            } else if (playbackState === 'stopped' || playbackState === 'paused') {
-                this.elements.playBtn.innerHTML = '▶';
-                this.elements.playBtn.classList.remove('playing');
-                this.elements.playBtn.classList.add('can-resume');
-                this.elements.playBtn.title = 'Продолжить';
-            } else {
-                this.elements.playBtn.innerHTML = '▶';
-                this.elements.playBtn.classList.remove('playing', 'can-resume');
-                this.elements.playBtn.title = 'Воспроизвести';
-            }
+            // Play button - теперь Play/Pause
+            const { playBtn, stopBtn } = this.elements;
             
-            // Pause button
-            if (isPaused) {
-                this.elements.pauseBtn.innerHTML = '▶';
-                this.elements.pauseBtn.classList.add('paused');
-                this.elements.pauseBtn.title = 'Продолжить';
+            if (isPlaying) {
+                playBtn.innerHTML = '⏸';
+                playBtn.classList.add('playing');
+                playBtn.title = 'Пауза';
             } else {
-                this.elements.pauseBtn.innerHTML = '⏸';
-                this.elements.pauseBtn.classList.remove('paused');
-                this.elements.pauseBtn.title = 'Пауза';
+                playBtn.innerHTML = '▶';
+                playBtn.classList.remove('playing');
+                playBtn.title = playbackState === 'stopped' || playbackState === 'paused' 
+                    ? 'Продолжить' : 'Воспроизвести';
+                
+                if (playbackState === 'stopped' || playbackState === 'paused') {
+                    playBtn.classList.add('can-resume');
+                } else {
+                    playBtn.classList.remove('can-resume');
+                }
             }
+
+            // Stop button visibility
+            stopBtn.classList.toggle('hidden', !isPlaying && playbackState !== 'paused' && playbackState !== 'stopped');
 
             // Next track
             if (nextTrack) {
@@ -570,7 +490,7 @@
 
         bindEvents() {
             const { 
-                refreshPlayers, playBtn, pauseBtn, nextBtn, prevBtn, 
+                refreshPlayers, playBtn, stopBtn, nextBtn, prevBtn, 
                 seekBack30, seekBack10, seekForward10, seekForward30, 
                 volumeSlider 
             } = this.elements;
@@ -580,13 +500,22 @@
                 this.vibrate();
             };
 
+            // Play/Pause - одна кнопка
             playBtn.onclick = () => {
-                this.send(playBtn.classList.contains('playing') ? 'stop' : 'play');
+                const state = this.lastState;
+                if (state?.isPlaying) {
+                    // Если играет - ставим на паузу
+                    this.send('pause');
+                } else {
+                    // Если не играет - запускаем (продолжаем)
+                    this.send('play');
+                }
                 this.vibrate();
             };
 
-            pauseBtn.onclick = () => {
-                this.send('pause');
+            // Stop - отдельная кнопка
+            stopBtn.onclick = () => {
+                this.send('stop');
                 this.vibrate();
             };
 
@@ -620,7 +549,6 @@
                 this.vibrate();
             };
 
-            // Volume throttle
             let volumeThrottle = null;
             volumeSlider.oninput = (e) => {
                 const v = parseInt(e.target.value);
@@ -635,7 +563,6 @@
                 }
             };
 
-            // Prevent double-tap zoom
             document.addEventListener('gesturestart', e => e.preventDefault());
             let lastTouch = 0;
             document.addEventListener('touchend', e => {

@@ -13,11 +13,32 @@ const remotes = new Map();
 
 // Отключаем кэш для HTML
 app.use((req, res, next) => {
-    if (req.url.endsWith('.html')) {
+    if (req.url.endsWith('.html') || req.url.startsWith('/remote')) {
         res.set('Cache-Control', 'no-store');
     }
     next();
 });
+
+// ============================================
+// ЧИСТЫЕ URL - ДОБАВИТЬ ПЕРЕД express.static
+// ============================================
+
+// /remote или /remote/ → remote.html
+app.get('/remote', (req, res) => {
+    res.sendFile(path.join(__dirname, 'remote.html'));
+});
+
+// /remote/player-xxx → remote.html (playerId в пути)
+app.get('/remote/:playerId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'remote.html'));
+});
+
+// Главная страница без .html
+app.get('/player', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// ============================================
 
 app.use(express.static(path.join(__dirname, '/')));
 
@@ -248,15 +269,19 @@ setInterval(() => {
     });
 }, 30000);
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 30441;
 server.listen(port, () => {
     console.log(`
 ╔════════════════════════════════════════════╗
-║   🎵 Concert Player Server v4.0            ║
+║   🎵 Concert Player Server v4.1            ║
 ║      Multi-room Edition                    ║
 ╠════════════════════════════════════════════╣
-║  Server is running on port ${port}             ║
-║  Access the player at the server's address.  ║
+║  Server running on port ${port}                ║
+║                                            ║
+║  URLs:                                     ║
+║  • /           → Main player               ║
+║  • /remote     → Remote control            ║
+║  • /remote/ID  → Direct connect to player  ║
 ╚════════════════════════════════════════════╝
     `);
 });

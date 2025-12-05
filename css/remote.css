@@ -1047,3 +1047,33 @@ body::before {
 .state-finished .remote-progress-bar::after {
     display: none;
 }
+
+/* Stop button */
+.remote-btn-stop {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #ff3b5c 0%, #cc2244 100%);
+    color: #fff;
+    font-size: 1.3rem;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.remote-btn-stop:active {
+    transform: scale(0.9);
+    box-shadow: 0 0 20px rgba(255, 59, 92, 0.5);
+}
+
+.remote-btn-stop.hidden {
+    display: none;
+}
+
+/* Play button when can resume */
+.remote-btn-primary.can-resume {
+    animation: canResumePulse 2s ease-in-out infinite;
+}
+
+@keyframes canResumePulse {
+    0%, 100% { box-shadow: var(--glow-accent); }
+    50% { box-shadow: 0 0 50px rgba(0, 255, 136, 0.6); }
+}

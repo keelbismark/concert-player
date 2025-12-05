@@ -38,7 +38,8 @@ class RemoteConnection {
 
     buildRemoteUrl() {
         const baseUrl = `${window.location.protocol}//${window.location.host}`;
-        return `${baseUrl}/remote.html?player=${encodeURIComponent(this.playerId)}`;
+        // Теперь красивый URL без .html и ?player=
+        return `${baseUrl}/remote/${encodeURIComponent(this.playerId)}`;
     }
 
     start() {
@@ -118,7 +119,7 @@ class RemoteConnection {
 
     handleMessage(data) {
         if (!data || !data.type) return;
-        
+
         switch (data.type) {
             case 'registered':
                 if (data.playerId && data.playerId !== this.playerId) {
@@ -132,77 +133,77 @@ class RemoteConnection {
                 }
                 console.log(`Registered as: ${this.playerName} (${this.playerId})`);
                 break;
-                
+
             case 'pong':
                 break;
-                
+
             case 'play':
                 this.app.play();
                 break;
-                
+
             case 'stop':
                 // ВАЖНО: Используем специальный метод с сохранением позиции
                 this.app.stopWithPosition();
                 break;
-                
+
             case 'pause':
                 this.app.togglePause();
                 break;
-                
+
             case 'next':
                 this.app.nextTrack();
                 break;
-                
+
             case 'prev':
                 this.app.prevTrack();
                 break;
-                
+
             case 'select':
                 if (typeof data.index === 'number') {
                     this.app.selectTrack(data.index);
                 }
                 break;
-                
+
             case 'volume':
                 if (typeof data.value === 'number') {
                     this.app.setVolume(data.value);
                 }
                 break;
-                
+
             case 'seek':
                 if (typeof data.position === 'number') {
                     this.handleSeek(data.position);
                 }
                 break;
-                
+
             case 'seek-relative':
                 if (typeof data.delta === 'number') {
                     this.handleSeekRelative(data.delta);
                 }
                 break;
-                
+
             case 'get-state':
                 this.sendStateImmediate();
                 break;
         }
     }
-    
+
     /**
      * Handle seek command from remote
      */
     handleSeek(position) {
         const track = this.app.playlist.getCurrent();
         if (!track || !track.duration) return;
-        
+
         const clampedPosition = Math.max(0, Math.min(track.duration - 0.1, position));
-        
+
         if (this.app.audioEngine.isPlaying) {
             // Играет - делаем seek
             this.app.audioEngine.seek(clampedPosition);
         } else {
             // Не играет - сохраняем позицию для следующего play
             this.app.audioEngine.pausePosition = clampedPosition;
-            
+
             // Обновляем UI
             this.app.ui.updateTime({
                 currentTime: clampedPosition,
@@ -211,21 +212,21 @@ class RemoteConnection {
                 progress: (clampedPosition / track.duration) * 100
             });
         }
-        
+
         this.sendStateImmediate();
     }
-    
+
     /**
      * Handle relative seek command from remote
      */
     handleSeekRelative(delta) {
         const track = this.app.playlist.getCurrent();
         if (!track || !track.duration) return;
-        
+
         // Получаем текущую позицию
         const currentPos = this.app.audioEngine.getCurrentTime();
         const newPosition = Math.max(0, Math.min(track.duration - 0.1, currentPos + delta));
-        
+
         this.handleSeek(newPosition);
     }
 
