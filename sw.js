@@ -30,8 +30,8 @@ const STATIC_ASSETS = [
     '/js/TouchMode.js',
     '/js/RemoteConnection.js',
     '/js/app.js',
-    '/icons/icon-192.png',
-    '/icons/icon-512.png'
+    '/assets/icons/icon-192.png',
+    '/assets/icons/icon-512.png'
 ];
 
 // ⭐ Файлы которые ВСЕГДА загружаются с сервера (не кэшируются)
