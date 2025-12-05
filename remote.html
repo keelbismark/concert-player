@@ -118,8 +118,7 @@
             this.ws.onopen = () => {
                 this.isConnected = true;
                 this.updateStatus('connected');
-                // Identify this client as a remote
-                this.send('identify', { clientType: 'remote' });
+                this.send('get-state');
             };
 
             this.ws.onmessage = (event) => {

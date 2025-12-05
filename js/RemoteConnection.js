@@ -25,8 +25,6 @@ class RemoteConnection {
                 console.log('WebSocket connection established');
                 this.isRunning = true;
                 this.app.ui.showToast('Remote control enabled', 'success');
-                // Identify this client as the main application
-                this.ws.send(JSON.stringify({ type: 'identify', clientType: 'main-app' }));
             };
 
             this.ws.onmessage = (event) => {
