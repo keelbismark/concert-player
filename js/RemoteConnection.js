@@ -9,13 +9,15 @@ class RemoteConnection {
         this.remoteUrl = '';
         this.connectedClients = 0;
         this.lastState = null;
+        this.broadcastInterval = null;
+        this.reconnectTimeout = null;
     }
 
     /**
      * Start the remote connection
      */
     start() {
-        if (this.isRunning) return;
+        if (this.isRunning) return { success: true, url: this.remoteUrl };
 
         try {
             const wsUrl = `ws://${window.location.host}`;
@@ -23,8 +25,18 @@ class RemoteConnection {
 
             this.ws.onopen = () => {
                 console.log('WebSocket connection established');
+                
+                // ✅ КРИТИЧЕСКИ ВАЖНО: Идентифицируемся как main-app
+                this.ws.send(JSON.stringify({
+                    type: 'identify',
+                    clientType: 'main-app'
+                }));
+                
                 this.isRunning = true;
-                this.app.ui.showToast('Remote control enabled', 'success');
+                this.app.ui.showToast('Remote control подключён', 'success');
+                
+                // Отправить начальное состояние
+                setTimeout(() => this.sendState(), 100);
             };
 
             this.ws.onmessage = (event) => {
@@ -39,12 +51,17 @@ class RemoteConnection {
             this.ws.onclose = () => {
                 console.log('WebSocket connection closed');
                 this.isRunning = false;
-                this.app.ui.showToast('Remote control disconnected', 'warning');
+                this.stopStateBroadcast();
+                
+                // Попытка переподключения через 3 секунды
+                this.reconnectTimeout = setTimeout(() => {
+                    console.log('Attempting to reconnect...');
+                    this.start();
+                }, 3000);
             };
 
             this.ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
-                this.app.ui.showToast('Remote control connection error', 'error');
             };
 
             this.remoteUrl = `${window.location.origin}/remote.html`;
@@ -66,12 +83,18 @@ class RemoteConnection {
      * Stop the remote connection
      */
     stop() {
-        if (!this.isRunning) return;
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+        
         this.stopStateBroadcast();
+        
         if (this.ws) {
             this.ws.close();
             this.ws = null;
         }
+        
         this.isRunning = false;
         console.log('Remote connection stopped');
     }
@@ -82,7 +105,7 @@ class RemoteConnection {
     handleMessage(data) {
         if (!data || !data.type) return;
 
-        console.log('Remote command:', data.type);
+        console.log('Remote command received:', data.type);
 
         switch (data.type) {
             case 'play':
@@ -116,8 +139,11 @@ class RemoteConnection {
                 }
                 break;
             case 'get-state':
+                // ✅ Сервер запросил состояние — отправляем
                 this.sendState();
                 break;
+            default:
+                console.log('Unknown command:', data.type);
         }
     }
 
@@ -156,8 +182,12 @@ class RemoteConnection {
             playlistLength: this.app.playlist.length
         };
 
-        this.ws.send(JSON.stringify(state));
-        this.lastState = state;
+        try {
+            this.ws.send(JSON.stringify(state));
+            this.lastState = state;
+        } catch (error) {
+            console.error('Error sending state:', error);
+        }
     }
 
     /**
@@ -168,14 +198,18 @@ class RemoteConnection {
 
         // Broadcast state every 100ms when playing
         this.broadcastInterval = setInterval(() => {
-            if (this.app.audioEngine.isPlaying) {
+            if (this.app.audioEngine.isPlaying && !this.app.audioEngine.isPaused) {
                 this.sendState();
             }
         }, 100);
 
         // Also send on significant events
-        this.app.playlist.on('change', () => this.sendState());
-        this.app.playlist.on('select', () => this.sendState());
+        const sendStateHandler = () => this.sendState();
+        this.app.playlist.on('change', sendStateHandler);
+        this.app.playlist.on('select', sendStateHandler);
+        
+        // Store handlers for cleanup
+        this._eventHandlers = { sendStateHandler };
     }
 
     /**
@@ -236,6 +270,10 @@ class RemoteConnection {
                     <button id="copy-remote-url" class="modal-btn primary" style="width: 100%;">
                         📋 Копировать ссылку
                     </button>
+                    
+                    <div style="margin-top: 16px; padding: 12px; background: rgba(0,255,136,0.1); border-radius: 8px; font-size: 0.85rem; color: var(--accent-primary);">
+                        ✓ Сервер запущен и готов к подключениям
+                    </div>
                 </div>
             </div>
         `;

@@ -72,265 +72,315 @@
     </div>
 
     <script>
-    /**
-     * Mobile Remote Client using WebSockets
-     */
-    class RemoteClient {
-        constructor() {
-            this.ws = null;
-            this.isConnected = false;
-            this.reconnectInterval = 5000; // 5 seconds
+/**
+ * Mobile Remote Client using WebSockets
+ */
+class RemoteClient {
+    constructor() {
+        this.ws = null;
+        this.isConnected = false;
+        this.reconnectInterval = 3000;
+        this.isIdentified = false;
 
-            this.cacheElements();
-            this.connect();
-            this.bindEvents();
-        }
+        this.cacheElements();
+        this.connect();
+        this.bindEvents();
+    }
 
-        cacheElements() {
-            this.elements = {
-                status: document.getElementById('connection-status'),
-                trackTitle: document.getElementById('remote-track-title'),
-                trackNote: document.getElementById('remote-track-note'),
-                timer: document.getElementById('remote-timer'),
-                progress: document.getElementById('remote-progress'),
-                timeCurrent: document.getElementById('remote-time-current'),
-                timeTotal: document.getElementById('remote-time-total'),
-                playBtn: document.getElementById('remote-play'),
-                pauseBtn: document.getElementById('remote-pause'),
-                prevBtn: document.getElementById('remote-prev'),
-                nextBtn: document.getElementById('remote-next'),
-                nextUpTitle: document.getElementById('next-up-title'),
-                nextUpDuration: document.getElementById('next-up-duration'),
-                nextUpCard: document.getElementById('next-up-card'),
-                playlistItems: document.getElementById('remote-playlist-items'),
-                playlistCount: document.getElementById('playlist-count'),
-                volumeSlider: document.getElementById('remote-volume'),
-                volumeValue: document.getElementById('remote-volume-value'),
-                volumeIcon: document.getElementById('remote-volume-icon')
-            };
-        }
+    cacheElements() {
+        this.elements = {
+            status: document.getElementById('connection-status'),
+            trackTitle: document.getElementById('remote-track-title'),
+            trackNote: document.getElementById('remote-track-note'),
+            timer: document.getElementById('remote-timer'),
+            progress: document.getElementById('remote-progress'),
+            timeCurrent: document.getElementById('remote-time-current'),
+            timeTotal: document.getElementById('remote-time-total'),
+            playBtn: document.getElementById('remote-play'),
+            pauseBtn: document.getElementById('remote-pause'),
+            prevBtn: document.getElementById('remote-prev'),
+            nextBtn: document.getElementById('remote-next'),
+            nextUpTitle: document.getElementById('next-up-title'),
+            nextUpDuration: document.getElementById('next-up-duration'),
+            nextUpCard: document.getElementById('next-up-card'),
+            playlistItems: document.getElementById('remote-playlist-items'),
+            playlistCount: document.getElementById('playlist-count'),
+            volumeSlider: document.getElementById('remote-volume'),
+            volumeValue: document.getElementById('remote-volume-value'),
+            volumeIcon: document.getElementById('remote-volume-icon')
+        };
+    }
 
-        connect() {
-            this.updateStatus('connecting');
-            const wsUrl = `ws://${window.location.host}`;
-            this.ws = new WebSocket(wsUrl);
+    connect() {
+        this.updateStatus('connecting');
+        
+        const wsUrl = `ws://${window.location.host}`;
+        console.log('Connecting to:', wsUrl);
+        
+        this.ws = new WebSocket(wsUrl);
 
-            this.ws.onopen = () => {
-                this.isConnected = true;
-                this.updateStatus('connected');
-                this.send('get-state');
-            };
-
-            this.ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    this.handleMessage(data);
-                } catch (error) {
-                    console.error('Error parsing message:', error);
-                }
-            };
-
-            this.ws.onclose = () => {
-                this.isConnected = false;
-                this.updateStatus('disconnected');
-                setTimeout(() => this.connect(), this.reconnectInterval);
-            };
-
-            this.ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                this.ws.close();
-            };
-        }
-
-        handleMessage(data) {
-            if (!data) return;
-
-            if (data.type === 'state') {
-                this.updateUI(data);
-            }
-        }
-
-        updateStatus(status) {
-            const el = this.elements.status;
-            el.className = 'connection-status ' + status;
+        this.ws.onopen = () => {
+            console.log('WebSocket connected');
+            this.isConnected = true;
             
-            switch (status) {
-                case 'connected':
-                    el.textContent = '✓ Подключено';
-                    break;
-                case 'disconnected':
-                    el.textContent = '✕ Отключено';
-                    break;
-                case 'connecting':
-                    el.textContent = '⟳ Подключение...';
-                    break;
+            // ✅ КРИТИЧЕСКИ ВАЖНО: Идентифицируемся как remote
+            this.send('identify', { clientType: 'remote' });
+            this.isIdentified = true;
+            
+            this.updateStatus('connected');
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleMessage(data);
+            } catch (error) {
+                console.error('Error parsing message:', error);
             }
+        };
+
+        this.ws.onclose = () => {
+            console.log('WebSocket disconnected');
+            this.isConnected = false;
+            this.isIdentified = false;
+            this.updateStatus('disconnected');
+            
+            // Переподключение
+            setTimeout(() => this.connect(), this.reconnectInterval);
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.ws.close();
+        };
+    }
+
+    handleMessage(data) {
+        if (!data || !data.type) return;
+
+        console.log('Received:', data.type);
+
+        switch (data.type) {
+            case 'state':
+                this.updateUI(data);
+                break;
+                
+            case 'status':
+                // Статусные сообщения от сервера
+                if (data.status === 'waiting' || data.status === 'player-disconnected') {
+                    this.updateStatus('waiting');
+                    this.elements.status.textContent = data.message || 'Ожидание плеера...';
+                }
+                break;
+                
+            case 'error':
+                console.error('Server error:', data.message);
+                break;
+        }
+    }
+
+    updateStatus(status) {
+        const el = this.elements.status;
+        el.className = 'connection-status ' + status;
+        
+        switch (status) {
+            case 'connected':
+                el.textContent = '✓ Подключено';
+                break;
+            case 'disconnected':
+                el.textContent = '✕ Отключено';
+                break;
+            case 'connecting':
+                el.textContent = '⟳ Подключение...';
+                break;
+            case 'waiting':
+                el.className = 'connection-status connecting';
+                // текст устанавливается в handleMessage
+                break;
+        }
+    }
+
+    updateUI(state) {
+        // Track info
+        if (state.currentTrack) {
+            this.elements.trackTitle.textContent = state.currentTrack.title;
+            this.elements.trackNote.textContent = state.currentTrack.note || '';
+            this.elements.timeTotal.textContent = this.formatTime(state.currentTrack.duration);
+        } else {
+            this.elements.trackTitle.textContent = '—';
+            this.elements.trackNote.textContent = '';
+            this.elements.timeTotal.textContent = '0:00';
         }
 
-        updateUI(state) {
-            // Track info
-            if (state.currentTrack) {
-                this.elements.trackTitle.textContent = state.currentTrack.title;
-                this.elements.trackNote.textContent = state.currentTrack.note || '';
-                this.elements.timeTotal.textContent = this.formatTime(state.currentTrack.duration);
-            } else {
-                this.elements.trackTitle.textContent = '—';
-                this.elements.trackNote.textContent = '';
-                this.elements.timeTotal.textContent = '0:00';
-            }
+        // Timer
+        const remaining = Math.max(0, state.duration - state.currentTime);
+        this.elements.timer.textContent = this.formatTime(remaining);
+        this.elements.timeCurrent.textContent = this.formatTime(state.currentTime);
 
-            // Timer
-            const remaining = Math.max(0, state.duration - state.currentTime);
-            this.elements.timer.textContent = this.formatTime(remaining);
-            this.elements.timeCurrent.textContent = this.formatTime(state.currentTime);
-
-            // Timer warnings
-            this.elements.timer.classList.remove('warning', 'critical');
-            if (remaining <= 5 && remaining > 0) {
-                this.elements.timer.classList.add('critical');
-            } else if (remaining <= 15) {
-                this.elements.timer.classList.add('warning');
-            }
-
-            // Progress
-            const progress = state.duration > 0 ? (state.currentTime / state.duration) * 100 : 0;
-            this.elements.progress.style.width = `${progress}%`;
-
-            // Play/Pause buttons
-            if (state.isPlaying) {
-                this.elements.playBtn.innerHTML = '⏹';
-                this.elements.playBtn.classList.add('playing');
-            } else {
-                this.elements.playBtn.innerHTML = '▶';
-                this.elements.playBtn.classList.remove('playing');
-            }
-
-            if (state.isPaused) {
-                this.elements.pauseBtn.innerHTML = '▶';
-                this.elements.pauseBtn.classList.add('paused');
-            } else {
-                this.elements.pauseBtn.innerHTML = '⏸';
-                this.elements.pauseBtn.classList.remove('paused');
-            }
-
-            // Next track
-            if (state.nextTrack) {
-                this.elements.nextUpTitle.textContent = state.nextTrack.title;
-                this.elements.nextUpDuration.textContent = this.formatTime(state.nextTrack.duration);
-                this.elements.nextUpCard.style.display = '';
-            } else {
-                this.elements.nextUpCard.style.display = 'none';
-            }
-
-            // Volume
-            this.elements.volumeSlider.value = state.volume;
-            this.elements.volumeValue.textContent = `${state.volume}%`;
-            this.updateVolumeIcon(state.volume);
-
-            // Playlist
-            this.renderPlaylist(state.playlist, state.currentTrack?.index);
-            this.elements.playlistCount.textContent = `${state.playlistLength} треков`;
+        // Timer warnings
+        this.elements.timer.classList.remove('warning', 'critical');
+        if (remaining <= 5 && remaining > 0) {
+            this.elements.timer.classList.add('critical');
+        } else if (remaining <= 15) {
+            this.elements.timer.classList.add('warning');
         }
 
-        renderPlaylist(tracks, currentIndex) {
-            if (!tracks) return;
+        // Progress
+        const progress = state.duration > 0 ? (state.currentTime / state.duration) * 100 : 0;
+        this.elements.progress.style.width = `${progress}%`;
 
-            this.elements.playlistItems.innerHTML = tracks.map((track, i) => `
-                <div class="remote-track-item ${i === currentIndex ? 'current playing' : ''}" 
-                     data-index="${i}">
-                    <div class="remote-track-number">${i + 1}</div>
-                    <div class="remote-track-info">
-                        <div class="remote-track-name">${track.title}</div>
-                        <div class="remote-track-duration">${this.formatTime(track.duration)}</div>
-                    </div>
+        // Play/Pause buttons
+        if (state.isPlaying) {
+            this.elements.playBtn.innerHTML = '⏹';
+            this.elements.playBtn.classList.add('playing');
+        } else {
+            this.elements.playBtn.innerHTML = '▶';
+            this.elements.playBtn.classList.remove('playing');
+        }
+
+        if (state.isPaused) {
+            this.elements.pauseBtn.innerHTML = '▶';
+            this.elements.pauseBtn.classList.add('paused');
+        } else {
+            this.elements.pauseBtn.innerHTML = '⏸';
+            this.elements.pauseBtn.classList.remove('paused');
+        }
+
+        // Next track
+        if (state.nextTrack) {
+            this.elements.nextUpTitle.textContent = state.nextTrack.title;
+            this.elements.nextUpDuration.textContent = this.formatTime(state.nextTrack.duration);
+            this.elements.nextUpCard.style.display = '';
+        } else {
+            this.elements.nextUpCard.style.display = 'none';
+        }
+
+        // Volume
+        this.elements.volumeSlider.value = state.volume;
+        this.elements.volumeValue.textContent = `${state.volume}%`;
+        this.updateVolumeIcon(state.volume);
+
+        // Playlist
+        this.renderPlaylist(state.playlist, state.currentTrack?.index);
+        this.elements.playlistCount.textContent = `${state.playlistLength || 0} треков`;
+    }
+
+    renderPlaylist(tracks, currentIndex) {
+        if (!tracks || !Array.isArray(tracks)) return;
+
+        this.elements.playlistItems.innerHTML = tracks.map((track, i) => `
+            <div class="remote-track-item ${i === currentIndex ? 'current playing' : ''}" 
+                 data-index="${i}">
+                <div class="remote-track-number">${i + 1}</div>
+                <div class="remote-track-info">
+                    <div class="remote-track-name">${track.title}</div>
+                    <div class="remote-track-duration">${this.formatTime(track.duration)}</div>
                 </div>
-            `).join('');
+            </div>
+        `).join('');
 
-            // Bind click events
-            this.elements.playlistItems.querySelectorAll('.remote-track-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    const index = parseInt(item.dataset.index);
-                    this.send('select', { index });
-                });
-            });
-        }
-
-        updateVolumeIcon(value) {
-            if (value == 0) {
-                this.elements.volumeIcon.textContent = '🔇';
-            } else if (value < 50) {
-                this.elements.volumeIcon.textContent = '🔉';
-            } else {
-                this.elements.volumeIcon.textContent = '🔊';
-            }
-        }
-
-        send(type, data = {}) {
-            if (this.ws && this.isConnected) {
-                this.ws.send(JSON.stringify({ type, ...data }));
-            }
-        }
-
-        bindEvents() {
-            // Play/Stop
-            this.elements.playBtn.addEventListener('click', () => {
-                const isPlaying = this.elements.playBtn.classList.contains('playing');
-                this.send(isPlaying ? 'stop' : 'play');
+        // Bind click events
+        this.elements.playlistItems.querySelectorAll('.remote-track-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const index = parseInt(item.dataset.index);
+                this.send('select', { index });
                 this.vibrate();
             });
+        });
+    }
 
-            // Pause
-            this.elements.pauseBtn.addEventListener('click', () => {
-                this.send('pause');
-                this.vibrate();
-            });
-
-            // Next/Prev
-            this.elements.nextBtn.addEventListener('click', () => {
-                this.send('next');
-                this.vibrate();
-            });
-
-            this.elements.prevBtn.addEventListener('click', () => {
-                this.send('prev');
-                this.vibrate();
-            });
-
-            // Volume
-            this.elements.volumeSlider.addEventListener('input', (e) => {
-                const value = parseInt(e.target.value);
-                this.send('volume', { value });
-                this.elements.volumeValue.textContent = `${value}%`;
-                this.updateVolumeIcon(value);
-            });
-
-            // Prevent zoom
-            document.addEventListener('gesturestart', e => e.preventDefault());
-        }
-
-        vibrate(duration = 30) {
-            if (navigator.vibrate) {
-                navigator.vibrate(duration);
-            }
-        }
-
-        formatTime(seconds) {
-            if (!seconds || !isFinite(seconds)) return '0:00';
-            const min = Math.floor(seconds / 60);
-            const sec = Math.floor(seconds % 60);
-            return `${min}:${sec.toString().padStart(2, '0')}`;
+    updateVolumeIcon(value) {
+        if (value == 0) {
+            this.elements.volumeIcon.textContent = '🔇';
+        } else if (value < 50) {
+            this.elements.volumeIcon.textContent = '🔉';
+        } else {
+            this.elements.volumeIcon.textContent = '🔊';
         }
     }
 
-    // Initialize
-    document.addEventListener('DOMContentLoaded', () => {
-        new RemoteClient();
+    send(type, data = {}) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            const message = JSON.stringify({ type, ...data });
+            console.log('Sending:', type);
+            this.ws.send(message);
+        } else {
+            console.warn('Cannot send, WebSocket not open');
+        }
+    }
+
+    bindEvents() {
+        // Play/Stop
+        this.elements.playBtn.addEventListener('click', () => {
+            const isPlaying = this.elements.playBtn.classList.contains('playing');
+            this.send(isPlaying ? 'stop' : 'play');
+            this.vibrate();
+        });
+
+        // Pause
+        this.elements.pauseBtn.addEventListener('click', () => {
+            this.send('pause');
+            this.vibrate();
+        });
+
+        // Next/Prev
+        this.elements.nextBtn.addEventListener('click', () => {
+            this.send('next');
+            this.vibrate();
+        });
+
+        this.elements.prevBtn.addEventListener('click', () => {
+            this.send('prev');
+            this.vibrate();
+        });
+
+        // Volume
+        this.elements.volumeSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            this.send('volume', { value });
+            this.elements.volumeValue.textContent = `${value}%`;
+            this.updateVolumeIcon(value);
+        });
+
+        // Prevent zoom on iOS
+        document.addEventListener('gesturestart', e => e.preventDefault());
+        
+        // Prevent double-tap zoom
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    }
+
+    vibrate(duration = 30) {
+        if (navigator.vibrate) {
+            navigator.vibrate(duration);
+        }
+    }
+
+    formatTime(seconds) {
+        if (!seconds || !isFinite(seconds)) return '0:00';
+        const min = Math.floor(seconds / 60);
+        const sec = Math.floor(seconds % 60);
+        return `${min}:${sec.toString().padStart(2, '0')}`;
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    window.remoteClient = new RemoteClient();
+});
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+        console.log('SW registration failed:', err);
     });
-
-    // Register service worker for PWA
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js');
-    }
-    </script>
+}
+</script>
 </body>
 </html>
