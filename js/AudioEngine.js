@@ -11,15 +11,12 @@ class AudioEngine {
         this.masterGain = this.context.createGain();
         this.analyser = this.context.createAnalyser();
         
-        // Connect: source -> trackGain -> masterGain -> analyser -> destination
         this.masterGain.connect(this.analyser);
         this.analyser.connect(this.context.destination);
         
-        // Analyser config
         this.analyser.fftSize = 256;
         this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
         
-        // Current playback state
         this.currentSource = null;
         this.currentGainNode = null;
         this.currentBuffer = null;
@@ -32,41 +29,26 @@ class AudioEngine {
         this.pausePosition = 0;
         this.playbackRate = 1;
         
-        // Callbacks
         this.onEnded = null;
         this.onTimeUpdate = null;
-        
-        // Timer
         this.updateInterval = null;
     }
 
-    /**
-     * Resume audio context (required after user interaction)
-     */
     async resume() {
         if (this.context.state === 'suspended') {
             await this.context.resume();
         }
     }
 
-    /**
-     * Decode audio file to buffer
-     */
     async decodeAudio(arrayBuffer) {
         return await this.context.decodeAudioData(arrayBuffer);
     }
 
-    /**
-     * Load and decode audio file
-     */
     async loadFile(file) {
         const arrayBuffer = await Utils.readFileAsArrayBuffer(file);
         return await this.decodeAudio(arrayBuffer);
     }
 
-    /**
-     * Play audio buffer
-     */
     play(buffer, options = {}) {
         const {
             offset = 0,
@@ -76,7 +58,6 @@ class AudioEngine {
             onEnded = null
         } = options;
 
-        // Cleanup previous
         this.cleanup();
 
         this.currentBuffer = buffer;
@@ -84,24 +65,20 @@ class AudioEngine {
         this.playbackRate = playbackRate;
         this.onEnded = onEnded;
 
-        // Create source
         this.currentSource = this.context.createBufferSource();
         this.currentSource.buffer = buffer;
         this.currentSource.loop = loop;
         this.currentSource.playbackRate.value = playbackRate;
 
-        // Create gain for this track
         this.currentGainNode = this.context.createGain();
         this.currentSource.connect(this.currentGainNode);
         this.currentGainNode.connect(this.masterGain);
 
-        // Fade in
         if (fadeIn > 0 && offset === 0) {
             this.currentGainNode.gain.setValueAtTime(0, this.context.currentTime);
             this.currentGainNode.gain.linearRampToValueAtTime(1, this.context.currentTime + fadeIn);
         }
 
-        // Handle ended
         this.currentSource.onended = () => {
             if (this.isPlaying && !this.isLooping) {
                 this.isPlaying = false;
@@ -112,25 +89,19 @@ class AudioEngine {
             }
         };
 
-        // Start playback
         this.currentSource.start(0, offset);
         this.startTime = this.context.currentTime - offset;
         this.isPlaying = true;
         this.isPaused = false;
-        // НЕ сбрасываем pausePosition здесь!
+        // НЕ сбрасываем pausePosition здесь - он уже использован в offset
 
         this.startUpdates();
     }
 
-    /**
-     * Stop playback with optional fade out
-     * @param {number} fadeOut - fade out duration in seconds
-     * @param {boolean} preservePosition - save position for resume (default: false)
-     */
     stop(fadeOut = 0, preservePosition = false) {
         if (!this.currentSource && !this.isPaused) return;
 
-        // Сохраняем позицию ДО остановки
+        // Сохраняем позицию ДО любых действий
         const currentPos = this.getCurrentTime();
 
         const doStop = () => {
@@ -140,15 +111,18 @@ class AudioEngine {
             this.stopUpdates();
             
             if (preservePosition && currentPos > 0) {
-                // Сохраняем позицию для продолжения
                 this.pausePosition = currentPos;
             } else {
-                // Полный сброс
                 this.pausePosition = 0;
             }
         };
 
         if (fadeOut > 0 && this.currentGainNode) {
+            // Сохраняем позицию ДО fade
+            if (preservePosition) {
+                this.pausePosition = currentPos;
+            }
+            
             const now = this.context.currentTime;
             this.currentGainNode.gain.setValueAtTime(this.currentGainNode.gain.value, now);
             this.currentGainNode.gain.linearRampToValueAtTime(0.001, now + fadeOut);
@@ -158,9 +132,6 @@ class AudioEngine {
         }
     }
 
-    /**
-     * Pause playback
-     */
     pause() {
         if (!this.isPlaying) return;
 
@@ -171,9 +142,6 @@ class AudioEngine {
         this.stopUpdates();
     }
 
-    /**
-     * Seek to position
-     */
     seek(position) {
         if (!this.currentBuffer) return;
 
@@ -181,34 +149,26 @@ class AudioEngine {
         const buffer = this.currentBuffer;
         const clampedPosition = Utils.clamp(position, 0, buffer.duration - 0.1);
         
-        const options = {
-            offset: clampedPosition,
-            loop: this.isLooping,
-            playbackRate: this.playbackRate,
-            onEnded: this.onEnded
-        };
-
         if (wasPlaying) {
             this.cleanup();
             this.isPlaying = false;
-            this.play(buffer, options);
+            this.play(buffer, {
+                offset: clampedPosition,
+                loop: this.isLooping,
+                playbackRate: this.playbackRate,
+                onEnded: this.onEnded
+            });
         } else {
             // Сохраняем позицию для следующего play
             this.pausePosition = clampedPosition;
         }
     }
 
-    /**
-     * Seek relative to current position
-     */
     seekRelative(delta) {
         const current = this.getCurrentTime();
         this.seek(current + delta);
     }
 
-    /**
-     * Set playback rate
-     */
     setPlaybackRate(rate) {
         this.playbackRate = Utils.clamp(rate, 0.5, 2);
         if (this.currentSource) {
@@ -216,9 +176,6 @@ class AudioEngine {
         }
     }
 
-    /**
-     * Set loop mode
-     */
     setLoop(enabled) {
         this.isLooping = enabled;
         if (this.currentSource) {
@@ -226,59 +183,38 @@ class AudioEngine {
         }
     }
 
-    /**
-     * Set master volume (0-1)
-     */
     setVolume(value) {
         const volume = Utils.clamp(value, 0, 1);
         this.masterGain.gain.setValueAtTime(volume, this.context.currentTime);
     }
 
-    /**
-     * Get current playback time
-     */
     getCurrentTime() {
         if (this.isPlaying) {
             return (this.context.currentTime - this.startTime) * this.playbackRate;
         }
-        // Для паузы, остановки - возвращаем сохранённую позицию
+        // Для паузы или остановки - возвращаем сохранённую позицию
         return this.pausePosition || 0;
     }
 
-    /**
-     * Get buffer duration
-     */
     getDuration() {
         return this.currentBuffer ? this.currentBuffer.duration : 0;
     }
 
-    /**
-     * Get remaining time
-     */
     getRemainingTime() {
         return Math.max(0, this.getDuration() - this.getCurrentTime());
     }
 
-    /**
-     * Get progress (0-100)
-     */
     getProgress() {
         const duration = this.getDuration();
         if (!duration) return 0;
         return (this.getCurrentTime() / duration) * 100;
     }
 
-    /**
-     * Get frequency data for visualizer
-     */
     getFrequencyData() {
         this.analyser.getByteFrequencyData(this.frequencyData);
         return this.frequencyData;
     }
 
-    /**
-     * Cleanup current source
-     */
     cleanup() {
         if (this.currentSource) {
             this.currentSource.onended = null;
@@ -294,9 +230,6 @@ class AudioEngine {
         }
     }
 
-    /**
-     * Start time update interval
-     */
     startUpdates() {
         this.stopUpdates();
         this.updateInterval = setInterval(() => {
@@ -311,9 +244,6 @@ class AudioEngine {
         }, 50);
     }
 
-    /**
-     * Stop time update interval
-     */
     stopUpdates() {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
@@ -321,9 +251,6 @@ class AudioEngine {
         }
     }
 
-    /**
-     * Destroy engine
-     */
     destroy() {
         this.cleanup();
         this.stopUpdates();

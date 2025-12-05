@@ -533,7 +533,7 @@ class ConcertPlayerApp {
         if (!this.playlist.hasSelection && !this.playlist.isEmpty) {
             this.selectTrack(0);
         }
-
+    
         const track = this.playlist.getCurrent();
         
         if (!track) {
@@ -545,13 +545,15 @@ class ConcertPlayerApp {
             this.ui.showToast('Трек ещё загружается...', 'warning');
             return;
         }
-
+    
         // Resume audio context (required after user interaction)
         this.audioEngine.resume();
-
-        // Get current offset for resume
+    
+        // ВАЖНО: Получаем сохранённую позицию
         const offset = this.audioEngine.pausePosition || 0;
-
+        
+        console.log('▶ Play from position:', offset); // Для отладки
+    
         // Play track
         this.audioEngine.play(track.buffer, {
             offset: offset,
@@ -560,17 +562,20 @@ class ConcertPlayerApp {
             playbackRate: this.currentSpeed,
             onEnded: () => this.onTrackEnded()
         });
-
+    
+        // Сбрасываем pausePosition после начала воспроизведения
+        // НЕТ! Не сбрасываем здесь - это делает AudioEngine.play()
+    
         // Start visualizer
         if (this.visualizer && this.settings.get('showVisualizer')) {
             this.visualizer.start();
         }
-
+    
         // Auto-start concert timer on first play
         if (!this.concertTimerRunning && this.concertElapsed === 0) {
             this.startConcertTimer();
         }
-
+    
         // Update UI
         this.ui.updatePlayButton(true);
         this.ui.updatePauseButton(false);
@@ -586,12 +591,12 @@ class ConcertPlayerApp {
     stop(withFade = true) {
         const fadeOut = withFade ? this.settings.get('fadeOutDuration') : 0;
         this.audioEngine.stop(fadeOut); // без preservePosition - сброс в начало
-    
+
         // Update UI
         this.ui.updatePlayButton(false);
         this.ui.updatePauseButton(false);
         this.ui.renderPlaylist();
-    
+
         // Reset time display
         const track = this.playlist.getCurrent();
         if (track) {
@@ -602,7 +607,7 @@ class ConcertPlayerApp {
                 progress: 0
             });
         }
-    
+
         this.broadcastState();
     }
 
@@ -735,23 +740,26 @@ class ConcertPlayerApp {
     }
 
     /**
-     * Stop but preserve position (for remote control)
+     * Stop playback but preserve position (for remote control)
      */
     stopWithPosition() {
-        const fadeOut = this.settings.get('fadeOutDuration') || 0;
-        
-        // Останавливаем с сохранением позиции
-        this.audioEngine.stop(fadeOut, true);
-    
+        // Сохраняем позицию ПЕРЕД остановкой
+        const currentPos = this.audioEngine.getCurrentTime();
+
+        // Останавливаем без fade (чтобы сразу)
+        this.audioEngine.stop(0, true); // preservePosition = true
+
+        // Принудительно сохраняем позицию
+        this.audioEngine.pausePosition = currentPos;
+
         // Update UI
         this.ui.updatePlayButton(false);
         this.ui.updatePauseButton(false);
         this.ui.renderPlaylist();
-    
-        // Показываем сохранённую позицию
+
+        // Показываем сохранённую позицию в UI
         const track = this.playlist.getCurrent();
         if (track) {
-            const currentPos = this.audioEngine.getCurrentTime();
             this.ui.updateTime({
                 currentTime: currentPos,
                 duration: track.duration || 0,
@@ -759,7 +767,7 @@ class ConcertPlayerApp {
                 progress: track.duration ? (currentPos / track.duration) * 100 : 0
             });
         }
-    
+
         this.broadcastState();
     }
 
