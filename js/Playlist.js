@@ -9,7 +9,8 @@ class Playlist {
         this.listeners = {
             change: [],
             select: [],
-            load: []
+            load: [],
+            reorder: []
         };
         this.importedData = null;
     }
@@ -19,7 +20,7 @@ class Playlist {
      */
     add(track) {
         const newTrack = {
-            id: Utils.generateId(),
+            id: track.id || Utils.generateId(),
             title: track.title || 'Unknown',
             file: track.file || null,
             buffer: track.buffer || null,
@@ -27,7 +28,10 @@ class Playlist {
             note: track.note || '',
             isLoaded: !!track.buffer,
             isLoading: false,
-            error: false
+            error: false,
+            // NEW: Additional metadata
+            addedAt: Date.now(),
+            color: track.color || null
         };
 
         this.tracks.push(newTrack);
@@ -41,7 +45,7 @@ class Playlist {
     remove(index) {
         if (index < 0 || index >= this.tracks.length) return false;
 
-        this.tracks.splice(index, 1);
+        const removed = this.tracks.splice(index, 1)[0];
 
         // Adjust current index
         if (this.tracks.length === 0) {
@@ -51,12 +55,22 @@ class Playlist {
         } else if (this.currentIndex > index) {
             this.currentIndex--;
         } else if (this.currentIndex === index) {
-            // Удалили текущий трек - сбрасываем выбор
             this.currentIndex = -1;
         }
 
         this.emit('change');
-        return true;
+        return removed;
+    }
+
+    /**
+     * Remove track by ID
+     */
+    removeById(id) {
+        const index = this.tracks.findIndex(t => t.id === id);
+        if (index !== -1) {
+            return this.remove(index);
+        }
+        return null;
     }
 
     /**
@@ -69,7 +83,8 @@ class Playlist {
         const copy = {
             ...original,
             id: Utils.generateId(),
-            title: original.title + ' (копия)'
+            title: original.title + ' (копия)',
+            addedAt: Date.now()
         };
 
         this.tracks.splice(index + 1, 0, copy);
@@ -78,26 +93,57 @@ class Playlist {
     }
 
     /**
-     * Reorder track
+     * Reorder track (legacy method name)
      */
     reorder(fromIndex, toIndex) {
-        if (fromIndex === toIndex) return;
-        if (fromIndex < 0 || fromIndex >= this.tracks.length) return;
-        if (toIndex < 0 || toIndex >= this.tracks.length) return;
+        return this.moveTrack(fromIndex, toIndex);
+    }
 
-        const track = this.tracks.splice(fromIndex, 1)[0];
+    /**
+     * Move track from one position to another
+     * NEW: Enhanced method for drag & drop
+     */
+    moveTrack(fromIndex, toIndex) {
+        // Validate indices
+        if (fromIndex === toIndex) return false;
+        if (fromIndex < 0 || fromIndex >= this.tracks.length) return false;
+        if (toIndex < 0 || toIndex >= this.tracks.length) return false;
+
+        // Remove track from original position
+        const [track] = this.tracks.splice(fromIndex, 1);
+        
+        // Insert at new position
         this.tracks.splice(toIndex, 0, track);
 
-        // Adjust current index
+        // Adjust current index to follow the currently selected track
         if (this.currentIndex === fromIndex) {
+            // The selected track was moved
             this.currentIndex = toIndex;
         } else if (fromIndex < this.currentIndex && toIndex >= this.currentIndex) {
+            // Track moved from before current to after/at current
             this.currentIndex--;
         } else if (fromIndex > this.currentIndex && toIndex <= this.currentIndex) {
+            // Track moved from after current to before/at current
             this.currentIndex++;
         }
 
+        this.emit('reorder', { fromIndex, toIndex, track });
         this.emit('change');
+        return true;
+    }
+
+    /**
+     * Get track by ID
+     */
+    getById(id) {
+        return this.tracks.find(t => t.id === id) || null;
+    }
+
+    /**
+     * Get track index by ID
+     */
+    getIndexById(id) {
+        return this.tracks.findIndex(t => t.id === id);
     }
 
     /**
@@ -107,8 +153,20 @@ class Playlist {
         if (index < 0 || index >= this.tracks.length) return null;
 
         this.currentIndex = index;
-        this.emit('select', this.tracks[index]);
-        return this.tracks[index];
+        const track = this.tracks[index];
+        this.emit('select', track);
+        return track;
+    }
+
+    /**
+     * Select track by ID
+     */
+    selectById(id) {
+        const index = this.getIndexById(id);
+        if (index !== -1) {
+            return this.select(index);
+        }
+        return null;
     }
 
     /**
@@ -146,6 +204,13 @@ class Playlist {
     }
 
     /**
+     * Get current track (alias)
+     */
+    get currentTrack() {
+        return this.getCurrent();
+    }
+
+    /**
      * Get next track (without selecting)
      */
     getNext() {
@@ -163,6 +228,16 @@ class Playlist {
 
         Object.assign(this.tracks[index], updates);
         this.emit('change');
+    }
+
+    /**
+     * Update track by ID
+     */
+    updateTrackById(id, updates) {
+        const index = this.getIndexById(id);
+        if (index !== -1) {
+            this.updateTrack(index, updates);
+        }
     }
 
     /**
@@ -193,7 +268,6 @@ class Playlist {
      * Get remaining duration from current track
      */
     getRemainingDuration(fromPosition = 0) {
-        // Если плейлист пуст или нет выбранного трека
         if (this.tracks.length === 0 || this.currentIndex < 0) {
             return 0;
         }
@@ -243,16 +317,75 @@ class Playlist {
     }
 
     /**
+     * Sort tracks
+     */
+    sort(compareFn) {
+        const currentTrackId = this.currentIndex >= 0 ? this.tracks[this.currentIndex]?.id : null;
+        
+        this.tracks.sort(compareFn);
+        
+        // Restore current index after sort
+        if (currentTrackId) {
+            this.currentIndex = this.getIndexById(currentTrackId);
+        }
+        
+        this.emit('change');
+    }
+
+    /**
+     * Sort by title
+     */
+    sortByTitle(ascending = true) {
+        this.sort((a, b) => {
+            const comparison = a.title.localeCompare(b.title);
+            return ascending ? comparison : -comparison;
+        });
+    }
+
+    /**
+     * Sort by duration
+     */
+    sortByDuration(ascending = true) {
+        this.sort((a, b) => {
+            const comparison = (a.duration || 0) - (b.duration || 0);
+            return ascending ? comparison : -comparison;
+        });
+    }
+
+    /**
+     * Shuffle playlist
+     */
+    shuffle() {
+        const currentTrackId = this.currentIndex >= 0 ? this.tracks[this.currentIndex]?.id : null;
+        
+        // Fisher-Yates shuffle
+        for (let i = this.tracks.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [this.tracks[i], this.tracks[j]] = [this.tracks[j], this.tracks[i]];
+        }
+        
+        // Restore current index
+        if (currentTrackId) {
+            this.currentIndex = this.getIndexById(currentTrackId);
+        }
+        
+        this.emit('change');
+    }
+
+    /**
      * Export playlist data
      */
     export() {
         return {
             version: '3.1',
             exportDate: new Date().toISOString(),
+            currentIndex: this.currentIndex,
             tracks: this.tracks.map(track => ({
+                id: track.id,
                 title: track.title,
                 duration: track.duration,
-                note: track.note || ''
+                note: track.note || '',
+                color: track.color || null
             }))
         };
     }
@@ -265,6 +398,12 @@ class Playlist {
 
         // Store for later matching with audio files
         this.importedData = data.tracks;
+        
+        // If there's a saved current index, store it
+        if (typeof data.currentIndex === 'number') {
+            this._pendingCurrentIndex = data.currentIndex;
+        }
+        
         return true;
     }
 
@@ -274,11 +413,15 @@ class Playlist {
     matchImportedTrack(title) {
         if (!this.importedData) return null;
 
-        const match = this.importedData.find(t => 
-            t.title.toLowerCase() === title.toLowerCase() ||
-            title.toLowerCase().includes(t.title.toLowerCase()) ||
-            t.title.toLowerCase().includes(title.toLowerCase())
-        );
+        const normalizeTitle = (t) => t.toLowerCase().replace(/[^\w\s]/g, '').trim();
+        const normalizedTitle = normalizeTitle(title);
+
+        const match = this.importedData.find(t => {
+            const normalizedImported = normalizeTitle(t.title);
+            return normalizedImported === normalizedTitle ||
+                   normalizedTitle.includes(normalizedImported) ||
+                   normalizedImported.includes(normalizedTitle);
+        });
 
         return match || null;
     }
@@ -329,5 +472,12 @@ class Playlist {
      */
     get hasSelection() {
         return this.currentIndex >= 0 && this.currentIndex < this.tracks.length;
+    }
+
+    /**
+     * Get current playlist name (for display)
+     */
+    get name() {
+        return 'Concert Playlist';
     }
 }

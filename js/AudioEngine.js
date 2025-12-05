@@ -1,5 +1,6 @@
 /**
  * Audio Engine - Web Audio API wrapper
+ * With visibility change handling
  */
 
 class AudioEngine {
@@ -28,15 +29,329 @@ class AudioEngine {
         this.startTime = 0;
         this.pausePosition = 0;
         this.playbackRate = 1;
+        this.volume = 1;
         
         this.onEnded = null;
         this.onTimeUpdate = null;
         this.updateInterval = null;
+        
+        // NEW: Visibility change handling
+        this.wasPlayingBeforeHidden = false;
+        this.savedPositionBeforeHidden = 0;
+        this.autoResumeOnVisible = false; // Configurable
+        this.pauseOnHidden = false; // Configurable
+        
+        // NEW: State verification
+        this.lastKnownPosition = 0;
+        this.positionCheckInterval = null;
+        
+        // Initialize visibility handling
+        this.initVisibilityHandling();
+        
+        // Initialize audio focus handling
+        this.initAudioFocusHandling();
     }
+
+    /**
+     * NEW: Initialize visibility change handling
+     */
+    initVisibilityHandling() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.onPageHidden();
+            } else {
+                this.onPageVisible();
+            }
+        });
+
+        // Additional: handle window blur/focus
+        window.addEventListener('blur', () => this.onWindowBlur());
+        window.addEventListener('focus', () => this.onWindowFocus());
+
+        // Handle page freeze (mobile browsers)
+        if ('onfreeze' in document) {
+            document.addEventListener('freeze', () => this.onPageFreeze());
+            document.addEventListener('resume', () => this.onPageResume());
+        }
+    }
+
+    /**
+     * NEW: Initialize audio focus handling (for mobile)
+     */
+    initAudioFocusHandling() {
+        // Handle audio interruption (phone call, etc.)
+        if (this.context.onstatechange !== undefined) {
+            this.context.onstatechange = () => {
+                console.log('🔊 Audio context state:', this.context.state);
+                
+                if (this.context.state === 'interrupted') {
+                    this.onAudioInterrupted();
+                } else if (this.context.state === 'running' && this.wasPlayingBeforeHidden) {
+                    this.onAudioResumed();
+                }
+            };
+        }
+    }
+
+    /**
+     * NEW: Handle page becoming hidden
+     */
+    onPageHidden() {
+        console.log('📱 Page hidden, audio state:', this.isPlaying ? 'playing' : 'stopped');
+        
+        // Save current state
+        this.wasPlayingBeforeHidden = this.isPlaying && !this.isPaused;
+        this.savedPositionBeforeHidden = this.getCurrentTime();
+        this.lastKnownPosition = this.savedPositionBeforeHidden;
+        
+        // Optionally pause on hide (configurable)
+        if (this.pauseOnHidden && this.isPlaying) {
+            this.pause();
+            console.log('⏸ Auto-paused on page hide');
+        }
+        
+        // Save state to localStorage for crash recovery
+        this.saveEmergencyState();
+    }
+
+    /**
+     * NEW: Handle page becoming visible
+     */
+    onPageVisible() {
+        console.log('📱 Page visible, was playing:', this.wasPlayingBeforeHidden);
+        
+        // Verify audio state
+        this.verifyAudioState();
+        
+        // Optionally auto-resume
+        if (this.autoResumeOnVisible && this.wasPlayingBeforeHidden && !this.isPlaying) {
+            console.log('▶ Auto-resuming playback');
+            this.resumeFromPosition(this.savedPositionBeforeHidden);
+        }
+        
+        this.wasPlayingBeforeHidden = false;
+    }
+
+    /**
+     * NEW: Handle window blur
+     */
+    onWindowBlur() {
+        // Less aggressive than page hidden - just save position
+        if (this.isPlaying) {
+            this.lastKnownPosition = this.getCurrentTime();
+        }
+    }
+
+    /**
+     * NEW: Handle window focus
+     */
+    onWindowFocus() {
+        // Verify audio is still playing correctly
+        this.verifyAudioState();
+    }
+
+    /**
+     * NEW: Handle page freeze (mobile)
+     */
+    onPageFreeze() {
+        console.log('❄️ Page frozen');
+        this.wasPlayingBeforeHidden = this.isPlaying;
+        this.savedPositionBeforeHidden = this.getCurrentTime();
+        
+        // Force pause to save resources
+        if (this.isPlaying) {
+            this.pause();
+        }
+        
+        this.saveEmergencyState();
+    }
+
+    /**
+     * NEW: Handle page resume (mobile)
+     */
+    onPageResume() {
+        console.log('🔥 Page resumed');
+        this.verifyAudioState();
+    }
+
+    /**
+     * NEW: Handle audio interruption (phone call, etc.)
+     */
+    onAudioInterrupted() {
+        console.log('📞 Audio interrupted');
+        this.wasPlayingBeforeHidden = this.isPlaying;
+        this.savedPositionBeforeHidden = this.getCurrentTime();
+        
+        if (this.isPlaying) {
+            this.pause();
+        }
+    }
+
+    /**
+     * NEW: Handle audio resumed after interruption
+     */
+    onAudioResumed() {
+        console.log('📞 Audio interruption ended');
+        // Don't auto-resume - let user decide
+    }
+
+    /**
+     * NEW: Verify audio state is consistent
+     */
+    verifyAudioState() {
+        if (!this.isPlaying) return;
+        
+        // Check if source is still connected and playing
+        if (this.currentSource) {
+            const currentPos = this.getCurrentTime();
+            const drift = Math.abs(currentPos - this.lastKnownPosition);
+            
+            // If position hasn't changed in a while but we think we're playing
+            if (drift < 0.01 && this.isPlaying && !this.isPaused) {
+                console.warn('⚠️ Audio may be stuck, current:', currentPos, 'last:', this.lastKnownPosition);
+                
+                // Try to recover
+                this.attemptRecovery();
+            }
+            
+            this.lastKnownPosition = currentPos;
+        }
+        
+        // Check AudioContext state
+        if (this.context.state === 'suspended') {
+            console.warn('⚠️ AudioContext suspended, attempting resume');
+            this.resume();
+        }
+    }
+
+    /**
+     * NEW: Attempt to recover audio playback
+     */
+    attemptRecovery() {
+        if (!this.currentBuffer || !this.isPlaying) return;
+        
+        console.log('🔧 Attempting audio recovery...');
+        
+        const position = this.lastKnownPosition || this.pausePosition;
+        const buffer = this.currentBuffer;
+        const wasLooping = this.isLooping;
+        const rate = this.playbackRate;
+        const onEnded = this.onEnded;
+        
+        // Stop current playback
+        this.cleanup();
+        this.isPlaying = false;
+        
+        // Restart from saved position
+        setTimeout(() => {
+            this.play(buffer, {
+                offset: position,
+                loop: wasLooping,
+                playbackRate: rate,
+                onEnded: onEnded
+            });
+            console.log('✅ Audio recovered at position:', position);
+        }, 100);
+    }
+
+    /**
+     * NEW: Resume from specific position
+     */
+    resumeFromPosition(position) {
+        if (!this.currentBuffer) return;
+        
+        this.play(this.currentBuffer, {
+            offset: position,
+            loop: this.isLooping,
+            playbackRate: this.playbackRate,
+            onEnded: this.onEnded
+        });
+    }
+
+    /**
+     * NEW: Save emergency state to localStorage
+     */
+    saveEmergencyState() {
+        try {
+            const state = {
+                timestamp: Date.now(),
+                position: this.getCurrentTime(),
+                isPlaying: this.isPlaying,
+                isPaused: this.isPaused,
+                volume: this.volume,
+                playbackRate: this.playbackRate
+            };
+            localStorage.setItem('audioEngineEmergencyState', JSON.stringify(state));
+        } catch (e) {
+            // Ignore storage errors
+        }
+    }
+
+    /**
+     * NEW: Load emergency state from localStorage
+     */
+    loadEmergencyState() {
+        try {
+            const json = localStorage.getItem('audioEngineEmergencyState');
+            if (json) {
+                return JSON.parse(json);
+            }
+        } catch (e) {
+            // Ignore
+        }
+        return null;
+    }
+
+    /**
+     * NEW: Start position verification interval
+     */
+    startPositionVerification() {
+        this.stopPositionVerification();
+        this.positionCheckInterval = setInterval(() => {
+            if (this.isPlaying && !this.isPaused) {
+                const currentPos = this.getCurrentTime();
+                const expectedDelta = 1; // 1 second
+                const actualDelta = currentPos - this.lastKnownPosition;
+                
+                // If position hasn't advanced as expected
+                if (actualDelta < 0.5 && actualDelta >= 0) {
+                    console.warn('⚠️ Audio position stalled');
+                    this.verifyAudioState();
+                }
+                
+                this.lastKnownPosition = currentPos;
+            }
+        }, 1000);
+    }
+
+    /**
+     * NEW: Stop position verification interval
+     */
+    stopPositionVerification() {
+        if (this.positionCheckInterval) {
+            clearInterval(this.positionCheckInterval);
+            this.positionCheckInterval = null;
+        }
+    }
+
+    /**
+     * NEW: Configure visibility behavior
+     */
+    setVisibilityBehavior(options = {}) {
+        if (typeof options.pauseOnHidden === 'boolean') {
+            this.pauseOnHidden = options.pauseOnHidden;
+        }
+        if (typeof options.autoResumeOnVisible === 'boolean') {
+            this.autoResumeOnVisible = options.autoResumeOnVisible;
+        }
+    }
+
+    // ==================== EXISTING METHODS ====================
 
     async resume() {
         if (this.context.state === 'suspended') {
             await this.context.resume();
+            console.log('🔊 AudioContext resumed');
         }
     }
 
@@ -74,9 +389,12 @@ class AudioEngine {
         this.currentSource.connect(this.currentGainNode);
         this.currentGainNode.connect(this.masterGain);
 
+        // Apply current volume
+        this.currentGainNode.gain.setValueAtTime(this.volume, this.context.currentTime);
+
         if (fadeIn > 0 && offset === 0) {
             this.currentGainNode.gain.setValueAtTime(0, this.context.currentTime);
-            this.currentGainNode.gain.linearRampToValueAtTime(1, this.context.currentTime + fadeIn);
+            this.currentGainNode.gain.linearRampToValueAtTime(this.volume, this.context.currentTime + fadeIn);
         }
 
         this.currentSource.onended = () => {
@@ -85,6 +403,7 @@ class AudioEngine {
                 this.isPaused = false;
                 this.pausePosition = 0;
                 this.stopUpdates();
+                this.stopPositionVerification();
                 if (this.onEnded) this.onEnded();
             }
         };
@@ -93,15 +412,15 @@ class AudioEngine {
         this.startTime = this.context.currentTime - offset;
         this.isPlaying = true;
         this.isPaused = false;
-        // НЕ сбрасываем pausePosition здесь - он уже использован в offset
+        this.lastKnownPosition = offset;
 
         this.startUpdates();
+        this.startPositionVerification();
     }
 
     stop(fadeOut = 0, preservePosition = false) {
         if (!this.currentSource && !this.isPaused) return;
 
-        // Сохраняем позицию ДО любых действий
         const currentPos = this.getCurrentTime();
 
         const doStop = () => {
@@ -109,6 +428,7 @@ class AudioEngine {
             this.isPlaying = false;
             this.isPaused = false;
             this.stopUpdates();
+            this.stopPositionVerification();
             
             if (preservePosition && currentPos > 0) {
                 this.pausePosition = currentPos;
@@ -118,7 +438,6 @@ class AudioEngine {
         };
 
         if (fadeOut > 0 && this.currentGainNode) {
-            // Сохраняем позицию ДО fade
             if (preservePosition) {
                 this.pausePosition = currentPos;
             }
@@ -140,6 +459,7 @@ class AudioEngine {
         this.isPlaying = false;
         this.isPaused = true;
         this.stopUpdates();
+        this.stopPositionVerification();
     }
 
     seek(position) {
@@ -159,7 +479,6 @@ class AudioEngine {
                 onEnded: this.onEnded
             });
         } else {
-            // Сохраняем позицию для следующего play
             this.pausePosition = clampedPosition;
         }
     }
@@ -184,15 +503,14 @@ class AudioEngine {
     }
 
     setVolume(value) {
-        const volume = Utils.clamp(value, 0, 1);
-        this.masterGain.gain.setValueAtTime(volume, this.context.currentTime);
+        this.volume = Utils.clamp(value, 0, 1);
+        this.masterGain.gain.setValueAtTime(this.volume, this.context.currentTime);
     }
 
     getCurrentTime() {
         if (this.isPlaying) {
             return (this.context.currentTime - this.startTime) * this.playbackRate;
         }
-        // Для паузы или остановки - возвращаем сохранённую позицию
         return this.pausePosition || 0;
     }
 
@@ -254,6 +572,7 @@ class AudioEngine {
     destroy() {
         this.cleanup();
         this.stopUpdates();
+        this.stopPositionVerification();
         if (this.context.state !== 'closed') {
             this.context.close();
         }

@@ -20,6 +20,7 @@ class ConcertPlayerApp {
         this.isLoopingAll = false;
         this.lastVolume = 100;
         this.currentSpeed = 1;
+        this.hasUnsavedChanges = false;
 
         // Concert timer state
         this.concertTimerRunning = false;
@@ -33,6 +34,11 @@ class ConcertPlayerApp {
         this.touchMode = null;
         this.dragDrop = null;
         this.remoteConnection = null;
+        
+        // NEW: Additional modules
+        this.pageProtection = null;
+        this.cuePoints = null;
+        this.dragDropPlaylist = null;
 
         // Initialize everything
         this.init();
@@ -52,7 +58,7 @@ class ConcertPlayerApp {
             // 3. Initialize touch mode
             this.initTouchMode();
 
-            // 4. Initialize drag & drop
+            // 4. Initialize drag & drop (old)
             this.initDragDrop();
 
             // 5. Initialize remote connection
@@ -66,14 +72,25 @@ class ConcertPlayerApp {
 
             // 8. Bind playlist events
             this.playlist.on('change', () => {
+                this.hasUnsavedChanges = true;
                 this.ui.renderPlaylist();
                 this.updatePlaylistInfo();
                 this.broadcastState();
+                
+                // NEW: Refresh drag & drop after playlist changes
+                if (this.dragDropPlaylist) {
+                    this.dragDropPlaylist.refresh();
+                }
             });
             
             this.playlist.on('select', (track) => {
                 this.onTrackSelect(track);
                 this.broadcastState();
+                
+                // NEW: Render cue points for selected track
+                if (this.cuePoints && track) {
+                    this.cuePoints.renderCues(track.id);
+                }
             });
 
             // 9. Settings change listener
@@ -84,19 +101,173 @@ class ConcertPlayerApp {
             // 10. Start concert timer loop
             this.startConcertTimerLoop();
 
-            // 11. Setup before unload warning
-            this.setupBeforeUnload();
+            // 11. NEW: Initialize page protection (replaces old setupBeforeUnload)
+            this.initPageProtection();
 
-            // 12. Register service worker for PWA
+            // 12. NEW: Initialize cue points manager
+            this.initCuePoints();
+
+            // 13. NEW: Initialize enhanced drag & drop for playlist
+            this.initDragDropPlaylist();
+
+            // 14. Register service worker for PWA
             await this.registerServiceWorker();
 
-            // 13. Check for app install prompt
+            // 15. Check for app install prompt
             this.setupInstallPrompt();
+
+            // 16. NEW: Check for session recovery
+            await this.checkSessionRecovery();
 
             console.log('✅ Concert Player initialized successfully');
 
         } catch (error) {
             console.error('❌ Initialization error:', error);
+        }
+    }
+
+    // ==================== NEW: PAGE PROTECTION ====================
+
+    /**
+     * Initialize page protection module
+     */
+    initPageProtection() {
+        if (typeof PageProtection !== 'undefined') {
+            this.pageProtection = new PageProtection(this);
+            console.log('🛡️ Page protection initialized');
+        } else {
+            // Fallback to basic protection
+            this.setupBeforeUnload();
+        }
+    }
+
+    /**
+     * Fallback: Setup before unload warning
+     */
+    setupBeforeUnload() {
+        window.addEventListener('beforeunload', (e) => {
+            if (this.shouldProtectPage()) {
+                e.preventDefault();
+                e.returnValue = 'У вас есть несохранённые данные. Закрыть?';
+                return e.returnValue;
+            }
+        });
+    }
+
+    /**
+     * Check if page should be protected from closing
+     */
+    shouldProtectPage() {
+        if (!this.settings.get('confirmClose')) return false;
+        return this.audioEngine.isPlaying || 
+               !this.playlist.isEmpty || 
+               this.hasUnsavedChanges;
+    }
+
+    // ==================== NEW: CUE POINTS ====================
+
+    /**
+     * Initialize cue points manager
+     */
+    initCuePoints() {
+        if (typeof CuePointsManager !== 'undefined') {
+            this.cuePoints = new CuePointsManager(this);
+            console.log('📍 Cue points manager initialized');
+            
+            // Add cue points button to UI
+            this.addCuePointsButton();
+        }
+    }
+
+    /**
+     * Add cue points management button to track context menu
+     */
+    addCuePointsButton() {
+        // This will be called when rendering playlist items
+        // The actual button is added in UI.renderPlaylist()
+    }
+
+    /**
+     * Show cue points modal for track
+     */
+    showCuePointsModal(trackId) {
+        if (this.cuePoints) {
+            this.cuePoints.showCueModal(trackId);
+        }
+    }
+
+    /**
+     * Add cue point at current position
+     */
+    addCueAtCurrentPosition() {
+        if (this.cuePoints) {
+            this.cuePoints.addCueAtCurrentPosition();
+        }
+    }
+
+    // ==================== NEW: ENHANCED DRAG & DROP ====================
+
+    /**
+     * Initialize enhanced drag & drop for playlist reordering
+     */
+    initDragDropPlaylist() {
+        if (typeof DragDropPlaylist === 'undefined') return;
+
+        const playlistContainer = document.getElementById('playlist');
+        if (!playlistContainer) return;
+
+        this.dragDropPlaylist = new DragDropPlaylist(this, playlistContainer);
+        console.log('🎯 Enhanced drag & drop initialized');
+    }
+
+    // ==================== NEW: SESSION RECOVERY ====================
+
+    /**
+     * Check for session recovery
+     */
+    async checkSessionRecovery() {
+        if (!this.pageProtection) return;
+
+        const emergencyState = this.pageProtection.recoverFromEmergencyState();
+        if (emergencyState && emergencyState.playlistData?.tracks?.length > 0) {
+            const shouldRecover = await this.pageProtection.showRecoveryDialog(emergencyState);
+            if (shouldRecover) {
+                await this.restoreSession(emergencyState);
+            }
+        }
+    }
+
+    /**
+     * Restore session from emergency state
+     */
+    async restoreSession(state) {
+        try {
+            // Import playlist data
+            if (state.playlistData) {
+                this.playlist.import(state.playlistData);
+            }
+
+            // Restore volume
+            if (typeof state.volume === 'number') {
+                this.setVolume(state.volume);
+            }
+
+            // Select track and position
+            if (typeof state.currentTrackIndex === 'number') {
+                this.selectTrack(state.currentTrackIndex);
+                
+                // Note: Can't restore exact position without audio files loaded
+                // But we save the position for when files are re-loaded
+                if (state.position > 0) {
+                    this.audioEngine.pausePosition = state.position;
+                }
+            }
+
+            this.ui.showToast('Сессия восстановлена', 'success');
+            
+        } catch (e) {
+            console.error('Failed to restore session:', e);
+            this.ui.showToast('Ошибка восстановления сессии', 'error');
         }
     }
 
@@ -134,7 +305,7 @@ class ConcertPlayerApp {
     }
 
     /**
-     * Initialize enhanced drag & drop
+     * Initialize enhanced drag & drop (old version for file drops)
      */
     initDragDrop() {
         if (typeof DragDropManager === 'undefined') return;
@@ -249,21 +420,6 @@ class ConcertPlayerApp {
     }
 
     /**
-     * Setup before unload warning
-     */
-    setupBeforeUnload() {
-        window.addEventListener('beforeunload', (e) => {
-            if (this.settings.get('confirmClose')) {
-                if (this.audioEngine.isPlaying || !this.playlist.isEmpty) {
-                    e.preventDefault();
-                    e.returnValue = 'У вас есть несохранённые данные. Закрыть?';
-                    return e.returnValue;
-                }
-            }
-        });
-    }
-
-    /**
      * Handle settings changes
      */
     onSettingsChange(values) {
@@ -333,6 +489,11 @@ class ConcertPlayerApp {
                 
                 loadedCount++;
 
+                // NEW: Restore cue points if track was in a previous session
+                if (this.cuePoints) {
+                    this.cuePoints.renderCues(track.id);
+                }
+
             } catch (err) {
                 console.error('Failed to load audio:', file.name, err);
                 
@@ -358,6 +519,7 @@ class ConcertPlayerApp {
         }
 
         this.updatePlaylistInfo();
+        this.hasUnsavedChanges = true;
     }
 
     // ==================== PLAYLIST OPERATIONS ====================
@@ -388,6 +550,16 @@ class ConcertPlayerApp {
                 progress: 0
             });
             this.ui.scrollToCurrentTrack();
+            
+            // NEW: Update cue points display
+            if (this.cuePoints) {
+                this.cuePoints.renderCues(track.id);
+            }
+            
+            // NEW: Update media session
+            if (this.pageProtection) {
+                this.pageProtection.updateMediaSession(track);
+            }
         }
     }
 
@@ -412,6 +584,7 @@ class ConcertPlayerApp {
             
             this.ui.showToast('Трек удалён', 'success');
             this.updatePlaylistInfo();
+            this.hasUnsavedChanges = true;
         }
     }
 
@@ -423,6 +596,7 @@ class ConcertPlayerApp {
         
         if (copy) {
             this.ui.showToast('Трек скопирован', 'success');
+            this.hasUnsavedChanges = true;
         }
     }
 
@@ -431,6 +605,7 @@ class ConcertPlayerApp {
      */
     reorderTrack(fromIndex, toIndex) {
         this.playlist.reorder(fromIndex, toIndex);
+        this.hasUnsavedChanges = true;
     }
 
     /**
@@ -456,6 +631,7 @@ class ConcertPlayerApp {
         
         this.ui.showToast('Плейлист очищен', 'success');
         this.updatePlaylistInfo();
+        this.hasUnsavedChanges = false;
     }
 
     /**
@@ -552,7 +728,7 @@ class ConcertPlayerApp {
         // ВАЖНО: Получаем сохранённую позицию
         const offset = this.audioEngine.pausePosition || 0;
         
-        console.log('▶ Play from position:', offset); // Для отладки
+        console.log('▶ Play from position:', offset);
     
         // Play track
         this.audioEngine.play(track.buffer, {
@@ -562,9 +738,6 @@ class ConcertPlayerApp {
             playbackRate: this.currentSpeed,
             onEnded: () => this.onTrackEnded()
         });
-    
-        // Сбрасываем pausePosition после начала воспроизведения
-        // НЕТ! Не сбрасываем здесь - это делает AudioEngine.play()
     
         // Start visualizer
         if (this.visualizer && this.settings.get('showVisualizer')) {
@@ -581,6 +754,11 @@ class ConcertPlayerApp {
         this.ui.updatePauseButton(false);
         this.ui.renderPlaylist();
         
+        // NEW: Update media session
+        if (this.pageProtection) {
+            this.pageProtection.updateMediaSession(track);
+        }
+        
         // Broadcast to remotes
         this.broadcastState();
     }
@@ -590,7 +768,7 @@ class ConcertPlayerApp {
      */
     stop(withFade = true) {
         const fadeOut = withFade ? this.settings.get('fadeOutDuration') : 0;
-        this.audioEngine.stop(fadeOut); // без preservePosition - сброс в начало
+        this.audioEngine.stop(fadeOut);
 
         // Update UI
         this.ui.updatePlayButton(false);
@@ -616,7 +794,6 @@ class ConcertPlayerApp {
      */
     togglePlay() {
         if (this.audioEngine.isPlaying) {
-            // При ручной остановке через UI - НЕ сохраняем позицию (как было)
             this.stop(true, false);
         } else {
             this.play();
@@ -746,8 +923,8 @@ class ConcertPlayerApp {
         // Сохраняем позицию ПЕРЕД остановкой
         const currentPos = this.audioEngine.getCurrentTime();
 
-        // Останавливаем без fade (чтобы сразу)
-        this.audioEngine.stop(0, true); // preservePosition = true
+        // Останавливаем без fade
+        this.audioEngine.stop(0, true);
 
         // Принудительно сохраняем позицию
         this.audioEngine.pausePosition = currentPos;
@@ -1025,6 +1202,8 @@ class ConcertPlayerApp {
         const data = {
             ...this.playlist.export(),
             settings: this.settings.values,
+            // NEW: Export cue points
+            cuePoints: this.cuePoints ? this.cuePoints.export() : {},
             exportedAt: new Date().toISOString()
         };
 
@@ -1032,6 +1211,7 @@ class ConcertPlayerApp {
         Utils.downloadFile(JSON.stringify(data, null, 2), filename, 'application/json');
         
         this.ui.showToast('Плейлист экспортирован', 'success');
+        this.hasUnsavedChanges = false;
     }
 
     /**
@@ -1045,6 +1225,11 @@ class ConcertPlayerApp {
             // Import settings if present
             if (data.settings) {
                 this.settings.update(data.settings);
+            }
+
+            // NEW: Import cue points if present
+            if (data.cuePoints && this.cuePoints) {
+                this.cuePoints.import(data.cuePoints);
             }
 
             // Import playlist metadata
@@ -1110,6 +1295,19 @@ class ConcertPlayerApp {
             } else {
                 this.visualizer.stop();
             }
+        }
+    }
+
+    // ==================== TOAST HELPER ====================
+
+    /**
+     * Show toast notification
+     */
+    showToast(message, type = 'info') {
+        if (this.ui) {
+            this.ui.showToast(message, type);
+        } else {
+            console.log(`[${type}] ${message}`);
         }
     }
 
