@@ -497,20 +497,20 @@ class ConcertPlayerApp {
     updateRemainingDuration(currentPosition = 0) {
         const remainingEl = document.querySelector('#remaining-duration .footer-stat-value');
         if (!remainingEl) return;
-    
+
         // Если плейлист пуст
         if (this.playlist.isEmpty) {
             remainingEl.textContent = '--:--';
             return;
         }
-        
+
         // Если нет выбранного трека - показываем общую длительность
         if (!this.playlist.hasSelection) {
             const total = this.playlist.getTotalDuration();
             remainingEl.textContent = total > 0 ? Utils.formatTimeHMS(total) : '--:--';
             return;
         }
-    
+
         const remaining = this.playlist.getRemainingDuration(currentPosition);
         remainingEl.textContent = remaining > 0 ? Utils.formatTimeHMS(remaining) : '00:00:00';
     }
@@ -582,37 +582,43 @@ class ConcertPlayerApp {
 
     /**
      * Stop playback
+     * @param {boolean} withFade - use fade out
+     * @param {boolean} preservePosition - keep position for resume
      */
-    stop(withFade = true) {
+    stop(withFade = true, preservePosition = false) {
         const fadeOut = withFade ? this.settings.get('fadeOutDuration') : 0;
-        this.audioEngine.stop(fadeOut);
+
+        // Передаём preservePosition в audioEngine
+        this.audioEngine.stop(fadeOut, preservePosition);
 
         // Update UI
         this.ui.updatePlayButton(false);
         this.ui.updatePauseButton(false);
         this.ui.renderPlaylist();
 
-        // Reset time display
+        // Обновляем время - показываем сохранённую позицию или сбрасываем
         const track = this.playlist.getCurrent();
         if (track) {
+            const currentPos = preservePosition ? this.audioEngine.getCurrentTime() : 0;
             this.ui.updateTime({
-                currentTime: 0,
+                currentTime: currentPos,
                 duration: track.duration || 0,
-                remaining: track.duration || 0,
-                progress: 0
+                remaining: (track.duration || 0) - currentPos,
+                progress: track.duration ? (currentPos / track.duration) * 100 : 0
             });
         }
 
-        // Broadcast to remotes
-        this.broadcastState();
-    }
+    // Broadcast to remotes
+    this.broadcastState();
+}
 
     /**
      * Toggle play/stop
      */
     togglePlay() {
         if (this.audioEngine.isPlaying) {
-            this.stop();
+            // При ручной остановке через UI - НЕ сохраняем позицию (как было)
+            this.stop(true, false);
         } else {
             this.play();
         }

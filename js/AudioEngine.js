@@ -27,9 +27,11 @@ class AudioEngine {
         this.isPlaying = false;
         this.isPaused = false;
         this.isLooping = false;
+        this.isStopped = false; // НОВОЕ: флаг ручной остановки
         
         this.startTime = 0;
         this.pausePosition = 0;
+        this.stoppedPosition = 0; // НОВОЕ: позиция при остановке
         this.playbackRate = 1;
         
         // Callbacks
@@ -43,7 +45,7 @@ class AudioEngine {
     /**
      * Resume audio context (required after user interaction)
      */
-    async resume() {
+    async resumeContext() {
         if (this.context.state === 'suspended') {
             await this.context.resume();
         }
@@ -105,7 +107,10 @@ class AudioEngine {
         this.currentSource.onended = () => {
             if (this.isPlaying && !this.isLooping) {
                 this.isPlaying = false;
+                this.isPaused = false;
+                this.isStopped = false;
                 this.pausePosition = 0;
+                this.stoppedPosition = 0;
                 this.stopUpdates();
                 if (this.onEnded) this.onEnded();
             }
@@ -115,24 +120,42 @@ class AudioEngine {
         this.currentSource.start(0, offset);
         this.startTime = this.context.currentTime - offset;
         this.pausePosition = 0;
+        this.stoppedPosition = 0;
         this.isPlaying = true;
         this.isPaused = false;
+        this.isStopped = false;
 
         this.startUpdates();
     }
 
     /**
      * Stop playback with optional fade out
+     * @param {number} fadeOut - fade out duration in seconds
+     * @param {boolean} preservePosition - whether to preserve position for resume
      */
-    stop(fadeOut = 0) {
-        if (!this.currentSource) return;
+    stop(fadeOut = 0, preservePosition = false) {
+        if (!this.currentSource && !this.isPaused) return;
+
+        // Сохраняем текущую позицию ДО остановки
+        const currentPos = this.getCurrentTime();
 
         const doStop = () => {
             this.cleanup();
             this.isPlaying = false;
             this.isPaused = false;
-            this.pausePosition = 0;
             this.stopUpdates();
+            
+            if (preservePosition) {
+                // Сохраняем позицию для возможного продолжения
+                this.isStopped = true;
+                this.stoppedPosition = currentPos;
+                this.pausePosition = currentPos;
+            } else {
+                // Полный сброс
+                this.isStopped = false;
+                this.stoppedPosition = 0;
+                this.pausePosition = 0;
+            }
         };
 
         if (fadeOut > 0 && this.currentGainNode) {
@@ -155,21 +178,30 @@ class AudioEngine {
         this.cleanup();
         this.isPlaying = false;
         this.isPaused = true;
+        this.isStopped = false;
         this.stopUpdates();
     }
 
     /**
-     * Resume from pause
+     * Resume from pause or stopped state
      */
     resume() {
-        if (!this.isPaused || !this.currentBuffer) return;
-
-        this.play(this.currentBuffer, {
-            offset: this.pausePosition,
-            loop: this.isLooping,
-            playbackRate: this.playbackRate,
-            onEnded: this.onEnded
-        });
+        // Сначала проверяем контекст
+        if (this.context.state === 'suspended') {
+            this.context.resume();
+        }
+        
+        // Если на паузе или остановлено с сохранённой позицией
+        if ((this.isPaused || this.isStopped) && this.currentBuffer) {
+            const offset = this.pausePosition || this.stoppedPosition || 0;
+            
+            this.play(this.currentBuffer, {
+                offset: offset,
+                loop: this.isLooping,
+                playbackRate: this.playbackRate,
+                onEnded: this.onEnded
+            });
+        }
     }
 
     /**
@@ -180,8 +212,10 @@ class AudioEngine {
 
         const wasPlaying = this.isPlaying;
         const buffer = this.currentBuffer;
+        const clampedPosition = Utils.clamp(position, 0, buffer.duration - 0.1);
+        
         const options = {
-            offset: Utils.clamp(position, 0, buffer.duration - 0.1),
+            offset: clampedPosition,
             loop: this.isLooping,
             playbackRate: this.playbackRate,
             onEnded: this.onEnded
@@ -192,7 +226,9 @@ class AudioEngine {
             this.isPlaying = false;
             this.play(buffer, options);
         } else {
-            this.pausePosition = options.offset;
+            // Если не играет - сохраняем позицию
+            this.pausePosition = clampedPosition;
+            this.stoppedPosition = clampedPosition;
         }
     }
 
@@ -236,13 +272,17 @@ class AudioEngine {
      * Get current playback time
      */
     getCurrentTime() {
-        if (this.isPaused) {
-            return this.pausePosition;
-        }
         if (this.isPlaying) {
             return (this.context.currentTime - this.startTime) * this.playbackRate;
         }
-        return 0;
+        if (this.isPaused) {
+            return this.pausePosition;
+        }
+        if (this.isStopped) {
+            return this.stoppedPosition;
+        }
+        // Возвращаем сохранённую позицию если есть
+        return this.pausePosition || this.stoppedPosition || 0;
     }
 
     /**
@@ -319,6 +359,15 @@ class AudioEngine {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
         }
+    }
+
+    /**
+     * Reset position to beginning
+     */
+    resetPosition() {
+        this.pausePosition = 0;
+        this.stoppedPosition = 0;
+        this.isStopped = false;
     }
 
     /**

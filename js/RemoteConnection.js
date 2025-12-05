@@ -258,28 +258,22 @@ class RemoteConnection {
 
     sendStateImmediate() {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-
+        
         this.lastStateSent = Date.now();
-
+        
         const track = this.app.playlist.getCurrent();
         const nextTrack = this.app.playlist.getNext();
         
         // Получаем правильную текущую позицию
-        let currentTime;
-        if (this.app.audioEngine.isPaused) {
-            currentTime = this.app.audioEngine.pausePosition || 0;
-        } else if (this.app.audioEngine.isPlaying) {
-            currentTime = this.app.audioEngine.getCurrentTime();
-        } else {
-            currentTime = this.app.audioEngine.pausePosition || 0;
-        }
-
+        const currentTime = this.app.audioEngine.getCurrentTime();
+        
         const state = {
             type: 'state',
             playerId: this.playerId,
             playerName: this.playerName,
             isPlaying: this.app.audioEngine.isPlaying,
             isPaused: this.app.audioEngine.isPaused,
+            isStopped: this.app.audioEngine.isStopped, // НОВОЕ
             currentTime: currentTime,
             duration: track?.duration || 0,
             volume: this.app.volume,
@@ -301,7 +295,7 @@ class RemoteConnection {
             })),
             playlistLength: this.app.playlist.length
         };
-
+    
         try {
             this.ws.send(JSON.stringify(state));
         } catch (error) {
