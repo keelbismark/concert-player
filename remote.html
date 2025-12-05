@@ -102,9 +102,25 @@
             this.heartbeatInterval = null;
             this.lastPong = Date.now();
 
+            // КРИТИЧНО: Извлекаем playerId из URL параметра ?player=xxx
+            this.targetPlayerId = this.getPlayerIdFromUrl();
+            
+            console.log('🎮 Remote initialized');
+            console.log('Target player from URL:', this.targetPlayerId || 'none (will show list)');
+
             this.cacheElements();
             this.bindEvents();
             this.connect();
+        }
+
+        // Извлекаем playerId из URL
+        getPlayerIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const playerId = params.get('player');
+            if (playerId) {
+                return decodeURIComponent(playerId);
+            }
+            return null;
         }
 
         cacheElements() {
@@ -144,17 +160,27 @@
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}`;
             
+            console.log('Connecting to:', wsUrl);
+            
             try {
                 this.ws = new WebSocket(wsUrl);
             } catch (err) {
+                console.error('WebSocket error:', err);
                 this.scheduleReconnect();
                 return;
             }
 
             this.ws.onopen = () => {
+                console.log('✅ WebSocket connected');
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
-                this.ws.send(JSON.stringify({ type: 'identify', clientType: 'remote' }));
+                
+                // Идентификация как remote
+                this.ws.send(JSON.stringify({ 
+                    type: 'identify', 
+                    clientType: 'remote'
+                }));
+                
                 this.updateStatus('connected');
                 this.startHeartbeat();
             };
@@ -162,21 +188,29 @@
             this.ws.onmessage = (event) => {
                 try {
                     this.handleMessage(JSON.parse(event.data));
-                } catch (e) {}
+                } catch (e) {
+                    console.error('Parse error:', e);
+                }
             };
 
-            this.ws.onclose = () => {
+            this.ws.onclose = (event) => {
+                console.log('WebSocket closed:', event.code);
                 this.isConnected = false;
                 this.stopHeartbeat();
                 this.updateStatus('disconnected');
                 this.scheduleReconnect();
             };
 
-            this.ws.onerror = () => {};
+            this.ws.onerror = (err) => {
+                console.error('WebSocket error');
+            };
         }
 
         scheduleReconnect() {
-            const delay = Math.min(this.maxReconnectDelay, this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts));
+            const delay = Math.min(
+                this.maxReconnectDelay, 
+                this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts)
+            );
             this.reconnectAttempts++;
             this.elements.connectionInfo.textContent = `Переподключение через ${Math.round(delay/1000)}с...`;
             setTimeout(() => this.connect(), delay);
@@ -188,6 +222,7 @@
             this.heartbeatInterval = setInterval(() => {
                 if (this.ws?.readyState === WebSocket.OPEN) {
                     if (Date.now() - this.lastPong > 35000) {
+                        console.log('Heartbeat timeout');
                         this.ws.close();
                         return;
                     }
@@ -210,20 +245,34 @@
                 case 'pong':
                     this.lastPong = Date.now();
                     break;
+                    
                 case 'player-list':
                     this.handlePlayerList(data.players);
                     break;
+                    
                 case 'player-selected':
                     this.selectedPlayerId = data.playerId;
                     this.selectedPlayerName = data.playerName;
                     this.hidePlayerSelector();
-                    this.elements.connectionInfo.textContent = `Подключено к: ${data.playerName}`;
+                    this.elements.connectionInfo.textContent = `🎵 ${data.playerName}`;
+                    console.log('✅ Connected to player:', data.playerName);
                     break;
+                    
                 case 'player-disconnected':
+                    console.log('Player disconnected');
                     this.selectedPlayerId = null;
+                    this.selectedPlayerName = null;
                     this.showPlayerSelector();
+                    this.updateStatus('disconnected');
                     this.elements.status.textContent = data.message || 'Плеер отключился';
+                    setTimeout(() => this.send('get-players'), 1000);
                     break;
+                    
+                case 'error':
+                    console.error('Server error:', data.message);
+                    this.elements.connectionInfo.textContent = '⚠️ ' + data.message;
+                    break;
+                    
                 case 'state':
                     this.updateUI(data);
                     break;
@@ -232,40 +281,88 @@
 
         handlePlayerList(players) {
             this.players = players;
+            console.log('Player list:', players.length, 'players');
             
+            // Нет плееров
             if (!players.length) {
-                this.elements.playerList.innerHTML = '<div class="no-players"><p>Нет доступных плееров</p><p style="font-size:0.85rem;margin-top:8px">Откройте Concert Player на компьютере</p></div>';
+                this.elements.playerList.innerHTML = `
+                    <div class="no-players">
+                        <p>😴 Нет доступных плееров</p>
+                        <p style="font-size: 0.85rem; margin-top: 8px; opacity: 0.7;">
+                            Откройте Concert Player на компьютере
+                        </p>
+                    </div>
+                `;
                 this.showPlayerSelector();
                 return;
             }
             
-            if (players.length === 1 && !this.selectedPlayerId) {
+            // КРИТИЧНО: Если есть целевой плеер из URL - подключаемся к нему автоматически
+            if (this.targetPlayerId && !this.selectedPlayerId) {
+                const targetPlayer = players.find(p => p.id === this.targetPlayerId);
+                if (targetPlayer) {
+                    console.log('🎯 Auto-connecting to target player:', targetPlayer.name);
+                    this.selectPlayer(targetPlayer.id);
+                    return;
+                } else {
+                    console.warn('Target player not found:', this.targetPlayerId);
+                    this.elements.connectionInfo.textContent = '⚠️ Целевой плеер не найден';
+                }
+            }
+            
+            // Автовыбор если только один плеер и нет указанного в URL
+            if (players.length === 1 && !this.selectedPlayerId && !this.targetPlayerId) {
+                console.log('Auto-selecting single player:', players[0].name);
                 this.selectPlayer(players[0].id);
                 return;
             }
             
-            if (this.selectedPlayerId && players.find(p => p.id === this.selectedPlayerId)) {
-                this.hidePlayerSelector();
-                return;
+            // Если уже подключены к плееру который есть в списке
+            if (this.selectedPlayerId) {
+                const stillExists = players.find(p => p.id === this.selectedPlayerId);
+                if (stillExists) {
+                    this.hidePlayerSelector();
+                    return;
+                } else {
+                    this.selectedPlayerId = null;
+                    this.selectedPlayerName = null;
+                }
             }
             
+            // Показываем список для ручного выбора
             this.elements.playerList.innerHTML = players.map(p => `
-                <div class="player-item ${p.id === this.selectedPlayerId ? 'selected' : ''}" data-player-id="${p.id}">
+                <div class="player-item ${p.id === this.selectedPlayerId ? 'selected' : ''}" 
+                     data-player-id="${p.id}">
                     <div class="player-name">🎵 ${p.name}</div>
                     <div class="player-status">${p.hasState ? '● Воспроизведение' : '○ Готов'}</div>
+                    <div style="font-size: 0.65rem; opacity: 0.4; margin-top: 4px; font-family: monospace;">
+                        ${p.id.slice(-12)}
+                    </div>
                 </div>
             `).join('');
             
             this.elements.playerList.querySelectorAll('.player-item').forEach(item => {
-                item.onclick = () => { this.selectPlayer(item.dataset.playerId); this.vibrate(); };
+                item.onclick = () => {
+                    this.selectPlayer(item.dataset.playerId);
+                    this.vibrate();
+                };
             });
             
             this.showPlayerSelector();
         }
 
-        selectPlayer(id) { this.send('select-player', { playerId: id }); }
-        showPlayerSelector() { this.elements.playerSelector.classList.remove('hidden'); }
-        hidePlayerSelector() { this.elements.playerSelector.classList.add('hidden'); }
+        selectPlayer(id) {
+            console.log('Selecting player:', id);
+            this.send('select-player', { playerId: id });
+        }
+
+        showPlayerSelector() {
+            this.elements.playerSelector.classList.remove('hidden');
+        }
+
+        hidePlayerSelector() {
+            this.elements.playerSelector.classList.add('hidden');
+        }
 
         updateStatus(status) {
             const el = this.elements.status;
@@ -275,7 +372,10 @@
         }
 
         updateUI(state) {
-            const { currentTrack, nextTrack, duration = 0, currentTime = 0, volume, playlist, playlistLength, isPlaying, isPaused } = state;
+            const { 
+                currentTrack, nextTrack, duration = 0, currentTime = 0, 
+                volume, playlist, playlistLength, isPlaying, isPaused 
+            } = state;
 
             // Track info
             this.elements.trackTitle.textContent = currentTrack?.title || '—';
@@ -286,17 +386,38 @@
             const remaining = Math.max(0, duration - currentTime);
             this.elements.timer.textContent = this.formatTime(remaining);
             this.elements.timeCurrent.textContent = this.formatTime(currentTime);
-            this.elements.timer.classList.toggle('warning', remaining <= 15 && remaining > 5);
-            this.elements.timer.classList.toggle('critical', remaining <= 5 && remaining > 0);
+            
+            // Warning classes
+            this.elements.timer.classList.remove('warning', 'critical');
+            if (isPlaying && !isPaused && remaining > 0) {
+                if (remaining <= 5) {
+                    this.elements.timer.classList.add('critical');
+                } else if (remaining <= 15) {
+                    this.elements.timer.classList.add('warning');
+                }
+            }
 
             // Progress
-            this.elements.progress.style.width = `${duration > 0 ? (currentTime / duration) * 100 : 0}%`;
+            const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+            this.elements.progress.style.width = `${progress}%`;
 
-            // Buttons
-            this.elements.playBtn.innerHTML = isPlaying ? '⏹' : '▶';
-            this.elements.playBtn.classList.toggle('playing', isPlaying);
-            this.elements.pauseBtn.innerHTML = isPaused ? '▶' : '⏸';
-            this.elements.pauseBtn.classList.toggle('paused', isPaused);
+            // Play button
+            if (isPlaying) {
+                this.elements.playBtn.innerHTML = '⏹';
+                this.elements.playBtn.classList.add('playing');
+            } else {
+                this.elements.playBtn.innerHTML = '▶';
+                this.elements.playBtn.classList.remove('playing');
+            }
+            
+            // Pause button
+            if (isPaused) {
+                this.elements.pauseBtn.innerHTML = '▶';
+                this.elements.pauseBtn.classList.add('paused');
+            } else {
+                this.elements.pauseBtn.innerHTML = '⏸';
+                this.elements.pauseBtn.classList.remove('paused');
+            }
 
             // Next track
             if (nextTrack) {
@@ -318,7 +439,8 @@
             if (Array.isArray(playlist)) {
                 const currentIdx = currentTrack?.index;
                 this.elements.playlistItems.innerHTML = playlist.map((t, i) => `
-                    <div class="remote-track-item ${i === currentIdx ? 'current playing' : ''}" data-index="${t.index ?? i}">
+                    <div class="remote-track-item ${i === currentIdx ? 'current playing' : ''}" 
+                         data-index="${t.index ?? i}">
                         <div class="remote-track-number">${i + 1}</div>
                         <div class="remote-track-info">
                             <div class="remote-track-name">${t.title || 'Unknown'}</div>
@@ -328,7 +450,10 @@
                 `).join('');
 
                 this.elements.playlistItems.querySelectorAll('.remote-track-item').forEach(item => {
-                    item.onclick = () => { this.send('select', { index: parseInt(item.dataset.index) }); this.vibrate(); };
+                    item.onclick = () => {
+                        this.send('select', { index: parseInt(item.dataset.index) });
+                        this.vibrate();
+                    };
                 });
             }
             
@@ -344,34 +469,84 @@
         }
 
         bindEvents() {
-            const { refreshPlayers, playBtn, pauseBtn, nextBtn, prevBtn, seekBack30, seekBack10, seekForward10, seekForward30, volumeSlider, volumeValue, volumeIcon } = this.elements;
+            const { 
+                refreshPlayers, playBtn, pauseBtn, nextBtn, prevBtn, 
+                seekBack30, seekBack10, seekForward10, seekForward30, 
+                volumeSlider 
+            } = this.elements;
 
-            refreshPlayers.onclick = () => { this.send('get-players'); this.vibrate(); };
-            playBtn.onclick = () => { this.send(playBtn.classList.contains('playing') ? 'stop' : 'play'); this.vibrate(); };
-            pauseBtn.onclick = () => { this.send('pause'); this.vibrate(); };
-            nextBtn.onclick = () => { this.send('next'); this.vibrate(); };
-            prevBtn.onclick = () => { this.send('prev'); this.vibrate(); };
-            seekBack30.onclick = () => { this.send('seek-relative', { delta: -30 }); this.vibrate(); };
-            seekBack10.onclick = () => { this.send('seek-relative', { delta: -10 }); this.vibrate(); };
-            seekForward10.onclick = () => { this.send('seek-relative', { delta: 10 }); this.vibrate(); };
-            seekForward30.onclick = () => { this.send('seek-relative', { delta: 30 }); this.vibrate(); };
-
-            volumeSlider.oninput = (e) => {
-                const v = parseInt(e.target.value);
-                this.send('volume', { value: v });
-                volumeValue.textContent = `${v}%`;
-                volumeIcon.textContent = v === 0 ? '🔇' : v < 50 ? '🔉' : '🔊';
+            refreshPlayers.onclick = () => {
+                this.send('get-players');
+                this.vibrate();
             };
 
+            playBtn.onclick = () => {
+                this.send(playBtn.classList.contains('playing') ? 'stop' : 'play');
+                this.vibrate();
+            };
+
+            pauseBtn.onclick = () => {
+                this.send('pause');
+                this.vibrate();
+            };
+
+            nextBtn.onclick = () => {
+                this.send('next');
+                this.vibrate();
+            };
+
+            prevBtn.onclick = () => {
+                this.send('prev');
+                this.vibrate();
+            };
+
+            seekBack30.onclick = () => {
+                this.send('seek-relative', { delta: -30 });
+                this.vibrate();
+            };
+
+            seekBack10.onclick = () => {
+                this.send('seek-relative', { delta: -10 });
+                this.vibrate();
+            };
+
+            seekForward10.onclick = () => {
+                this.send('seek-relative', { delta: 10 });
+                this.vibrate();
+            };
+
+            seekForward30.onclick = () => {
+                this.send('seek-relative', { delta: 30 });
+                this.vibrate();
+            };
+
+            // Volume с throttle
+            let volumeThrottle = null;
+            volumeSlider.oninput = (e) => {
+                const v = parseInt(e.target.value);
+                this.elements.volumeValue.textContent = `${v}%`;
+                this.elements.volumeIcon.textContent = v === 0 ? '🔇' : v < 50 ? '🔉' : '🔊';
+                
+                if (!volumeThrottle) {
+                    volumeThrottle = setTimeout(() => {
+                        this.send('volume', { value: parseInt(volumeSlider.value) });
+                        volumeThrottle = null;
+                    }, 100);
+                }
+            };
+
+            // Prevent double-tap zoom
             document.addEventListener('gesturestart', e => e.preventDefault());
             let lastTouch = 0;
             document.addEventListener('touchend', e => {
                 if (Date.now() - lastTouch <= 300) e.preventDefault();
                 lastTouch = Date.now();
-            }, false);
+            }, { passive: false });
         }
 
-        vibrate(ms = 30) { navigator.vibrate?.(ms); }
+        vibrate(ms = 30) {
+            navigator.vibrate?.(ms);
+        }
         
         formatTime(s) {
             if (!s || !isFinite(s)) return '0:00';
@@ -379,7 +554,9 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => new RemoteClient());
+    document.addEventListener('DOMContentLoaded', () => {
+        window.remoteClient = new RemoteClient();
+    });
     </script>
 </body>
 </html>
