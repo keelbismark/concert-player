@@ -28,7 +28,6 @@
     <div class="remote-container">
         <!-- Now Playing -->
         <div class="now-playing-card">
-            <!-- Status Badge -->
             <div class="playback-status" id="playback-status">
                 <span class="status-icon" id="status-icon">○</span>
                 <span class="status-text" id="status-text">Готов</span>
@@ -39,7 +38,6 @@
             
             <div class="remote-timer" id="remote-timer">--:--</div>
             
-            <!-- Position indicator for stopped/paused state -->
             <div class="position-indicator" id="position-indicator"></div>
             
             <div class="remote-progress">
@@ -58,10 +56,10 @@
             </div>
         </div>
 
-        <!-- Controls - УПРОЩЁННЫЕ -->
+        <!-- Controls -->
         <div class="remote-controls">
             <button class="remote-btn remote-btn-secondary" id="remote-prev" title="Предыдущий">⏮</button>
-            <button class="remote-btn remote-btn-stop" id="remote-stop" title="Стоп">⏹</button>
+            <button class="remote-btn remote-btn-stop hidden" id="remote-stop" title="Стоп">⏹</button>
             <button class="remote-btn remote-btn-primary" id="remote-play" title="Play/Pause">▶</button>
             <button class="remote-btn remote-btn-secondary" id="remote-next" title="Следующий">⏭</button>
         </div>
@@ -121,20 +119,14 @@
         }
 
         getPlayerIdFromUrl() {
-            // 1. Проверяем путь /remote/player-xxx
             const pathMatch = window.location.pathname.match(/\/remote\/(.+)/);
-            if (pathMatch && pathMatch[1]) {
+            if (pathMatch?.[1]) {
                 return decodeURIComponent(pathMatch[1]);
             }
             
-            // 2. Проверяем query параметр ?player=xxx
             const params = new URLSearchParams(window.location.search);
             const playerId = params.get('player');
-            if (playerId) {
-                return decodeURIComponent(playerId);
-            }
-            
-            return null;
+            return playerId ? decodeURIComponent(playerId) : null;
         }
 
         cacheElements() {
@@ -209,7 +201,7 @@
                 }
             };
 
-            this.ws.onclose = (event) => {
+            this.ws.onclose = () => {
                 this.isConnected = false;
                 this.stopHeartbeat();
                 this.updateStatus('disconnected');
@@ -416,28 +408,30 @@
             const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
             this.elements.progress.style.width = `${progress}%`;
 
-            // Play button - теперь Play/Pause
+            // Play button
             const { playBtn, stopBtn } = this.elements;
             
             if (isPlaying) {
                 playBtn.innerHTML = '⏸';
                 playBtn.classList.add('playing');
+                playBtn.classList.remove('can-resume');
                 playBtn.title = 'Пауза';
             } else {
                 playBtn.innerHTML = '▶';
                 playBtn.classList.remove('playing');
-                playBtn.title = playbackState === 'stopped' || playbackState === 'paused' 
-                    ? 'Продолжить' : 'Воспроизвести';
                 
                 if (playbackState === 'stopped' || playbackState === 'paused') {
                     playBtn.classList.add('can-resume');
+                    playBtn.title = 'Продолжить';
                 } else {
                     playBtn.classList.remove('can-resume');
+                    playBtn.title = 'Воспроизвести';
                 }
             }
 
-            // Stop button visibility
-            stopBtn.classList.toggle('hidden', !isPlaying && playbackState !== 'paused' && playbackState !== 'stopped');
+            // Stop button - показываем только когда есть смысл останавливать
+            const showStop = isPlaying || playbackState === 'paused' || playbackState === 'stopped';
+            stopBtn.classList.toggle('hidden', !showStop);
 
             // Next track
             if (nextTrack) {
@@ -500,20 +494,15 @@
                 this.vibrate();
             };
 
-            // Play/Pause - одна кнопка
             playBtn.onclick = () => {
-                const state = this.lastState;
-                if (state?.isPlaying) {
-                    // Если играет - ставим на паузу
+                if (this.lastState?.isPlaying) {
                     this.send('pause');
                 } else {
-                    // Если не играет - запускаем (продолжаем)
                     this.send('play');
                 }
                 this.vibrate();
             };
 
-            // Stop - отдельная кнопка
             stopBtn.onclick = () => {
                 this.send('stop');
                 this.vibrate();
@@ -563,6 +552,7 @@
                 }
             };
 
+            // Prevent zoom on double-tap
             document.addEventListener('gesturestart', e => e.preventDefault());
             let lastTouch = 0;
             document.addEventListener('touchend', e => {

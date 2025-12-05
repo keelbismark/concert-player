@@ -1,5 +1,5 @@
 /* ============================================
-   MOBILE REMOTE STYLES - ENHANCED v4.0
+   MOBILE REMOTE STYLES v5.0
    ============================================ */
 
 :root {
@@ -15,6 +15,7 @@
     
     --gradient-accent: linear-gradient(135deg, #00ff88 0%, #00d4aa 50%, #00b894 100%);
     --gradient-danger: linear-gradient(135deg, #ff3b5c 0%, #cc2244 100%);
+    --gradient-warning: linear-gradient(135deg, #ffc107 0%, #ff9500 100%);
     --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%);
     
     --glow-accent: 0 0 40px rgba(0, 255, 136, 0.4);
@@ -66,7 +67,10 @@ body::before {
     z-index: 0;
 }
 
-/* ===== Player Selector ===== */
+/* ============================================
+   PLAYER SELECTOR
+   ============================================ */
+
 .player-selector {
     position: fixed;
     inset: 0;
@@ -152,7 +156,10 @@ body::before {
     opacity: 0.8;
 }
 
-/* ===== Connection Status ===== */
+/* ============================================
+   CONNECTION STATUS
+   ============================================ */
+
 .connection-status {
     position: fixed;
     top: 0;
@@ -217,7 +224,10 @@ body::before {
     50% { opacity: 0.7; }
 }
 
-/* ===== Remote Container ===== */
+/* ============================================
+   REMOTE CONTAINER
+   ============================================ */
+
 .remote-container {
     position: relative;
     z-index: 1;
@@ -232,7 +242,10 @@ body::before {
     gap: var(--spacing-md);
 }
 
-/* ===== Now Playing Card ===== */
+/* ============================================
+   NOW PLAYING CARD
+   ============================================ */
+
 .now-playing-card {
     background: var(--gradient-card), var(--remote-card);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -241,6 +254,7 @@ body::before {
     text-align: center;
     position: relative;
     overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .now-playing-card::before {
@@ -253,15 +267,7 @@ body::before {
     height: 3px;
     background: var(--gradient-accent);
     border-radius: 0 0 3px 3px;
-}
-
-.remote-track-label {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    color: var(--remote-accent);
-    margin-bottom: var(--spacing-sm);
-    font-weight: 700;
+    transition: background 0.3s, width 0.3s;
 }
 
 .remote-track-title {
@@ -282,7 +288,94 @@ body::before {
     margin-bottom: var(--spacing-sm);
 }
 
-/* ===== Timer Display ===== */
+/* ============================================
+   PLAYBACK STATUS BADGE
+   ============================================ */
+
+.playback-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: var(--spacing-sm);
+    transition: all 0.3s ease;
+}
+
+.status-icon {
+    font-size: 0.9rem;
+}
+
+.playback-status.status-playing {
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--remote-accent);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+    animation: statusPulseGreen 2s ease-in-out infinite;
+}
+
+.playback-status.status-paused {
+    background: rgba(255, 193, 7, 0.15);
+    color: var(--remote-warning);
+    animation: statusPulseOrange 1.5s ease-in-out infinite;
+}
+
+.playback-status.status-stopped {
+    background: rgba(255, 59, 92, 0.15);
+    color: var(--remote-danger);
+    box-shadow: 0 0 15px rgba(255, 59, 92, 0.2);
+}
+
+.playback-status.status-finished {
+    background: rgba(139, 148, 158, 0.15);
+    color: var(--remote-muted);
+}
+
+.playback-status.status-ready {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--remote-muted);
+}
+
+@keyframes statusPulseGreen {
+    0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
+    50% { box-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
+}
+
+@keyframes statusPulseOrange {
+    0%, 100% { opacity: 1; box-shadow: 0 0 15px rgba(255, 193, 7, 0.2); }
+    50% { opacity: 0.7; box-shadow: 0 0 25px rgba(255, 193, 7, 0.4); }
+}
+
+/* ============================================
+   POSITION INDICATOR
+   ============================================ */
+
+.position-indicator {
+    display: none;
+    font-size: 0.85rem;
+    color: var(--remote-warning);
+    background: rgba(255, 193, 7, 0.1);
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    margin: var(--spacing-sm) 0;
+    font-weight: 500;
+    text-align: center;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.now-playing-card.state-stopped .position-indicator {
+    color: var(--remote-accent);
+    background: rgba(0, 255, 136, 0.1);
+    border-color: rgba(0, 255, 136, 0.2);
+}
+
+/* ============================================
+   TIMER DISPLAY
+   ============================================ */
+
 .remote-timer {
     font-family: 'SF Mono', 'Fira Code', monospace;
     font-size: 4rem;
@@ -291,71 +384,115 @@ body::before {
     line-height: 1;
     margin: var(--spacing-md) 0;
     letter-spacing: -2px;
-    /* Базовое свечение текста */
     text-shadow: 
         0 0 20px rgba(0, 255, 136, 0.5),
-        0 0 40px rgba(0, 255, 136, 0.3),
-        0 0 60px rgba(0, 255, 136, 0.2);
+        0 0 40px rgba(0, 255, 136, 0.3);
+    transition: color 0.3s;
+}
+
+.remote-timer.playing {
     animation: remoteTimerGlow 3s ease-in-out infinite;
 }
 
-@keyframes remoteTimerGlow {
-    0%, 100% {
-        text-shadow: 
-            0 0 20px rgba(0, 255, 136, 0.5),
-            0 0 40px rgba(0, 255, 136, 0.3);
-    }
-    50% {
-        text-shadow: 
-            0 0 30px rgba(0, 255, 136, 0.7),
-            0 0 60px rgba(0, 255, 136, 0.5),
-            0 0 90px rgba(0, 255, 136, 0.3);
-    }
+.remote-timer.paused {
+    color: var(--remote-warning);
+    text-shadow: 
+        0 0 20px rgba(255, 193, 7, 0.5),
+        0 0 40px rgba(255, 193, 7, 0.3);
+    animation: timerPauseBlink 1.5s ease-in-out infinite;
+}
+
+.remote-timer.stopped {
+    color: var(--remote-danger);
+    text-shadow: 
+        0 0 20px rgba(255, 59, 92, 0.5),
+        0 0 40px rgba(255, 59, 92, 0.3);
+    animation: none;
+}
+
+.remote-timer.finished {
+    color: var(--remote-muted);
+    text-shadow: none;
+    animation: none;
 }
 
 .remote-timer.warning {
-    color: var(--remote-warning);
-    animation: remoteTimerWarning 1.5s ease-in-out infinite;
-}
-
-@keyframes remoteTimerWarning {
-    0%, 100% {
-        text-shadow: 
-            0 0 20px rgba(255, 193, 7, 0.5),
-            0 0 40px rgba(255, 193, 7, 0.3);
-        opacity: 1;
-    }
-    50% {
-        text-shadow: 
-            0 0 30px rgba(255, 193, 7, 0.8),
-            0 0 60px rgba(255, 193, 7, 0.5),
-            0 0 90px rgba(255, 193, 7, 0.3);
-        opacity: 0.9;
-    }
+    color: var(--remote-warning) !important;
+    animation: remoteTimerWarning 1.5s ease-in-out infinite !important;
 }
 
 .remote-timer.critical {
-    color: var(--remote-danger);
-    animation: remoteTimerCritical 0.4s ease-in-out infinite;
+    color: var(--remote-danger) !important;
+    animation: remoteTimerCritical 0.4s ease-in-out infinite !important;
+}
+
+@keyframes remoteTimerGlow {
+    0%, 100% { text-shadow: 0 0 20px rgba(0, 255, 136, 0.5), 0 0 40px rgba(0, 255, 136, 0.3); }
+    50% { text-shadow: 0 0 30px rgba(0, 255, 136, 0.7), 0 0 60px rgba(0, 255, 136, 0.5); }
+}
+
+@keyframes timerPauseBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes remoteTimerWarning {
+    0%, 100% { text-shadow: 0 0 20px rgba(255, 193, 7, 0.5); opacity: 1; }
+    50% { text-shadow: 0 0 40px rgba(255, 193, 7, 0.8); opacity: 0.9; }
 }
 
 @keyframes remoteTimerCritical {
-    0%, 100% {
-        text-shadow: 
-            0 0 20px rgba(255, 59, 92, 0.6),
-            0 0 40px rgba(255, 59, 92, 0.4);
-        opacity: 1;
-    }
-    50% {
-        text-shadow: 
-            0 0 40px rgba(255, 59, 92, 1),
-            0 0 80px rgba(255, 59, 92, 0.7),
-            0 0 120px rgba(255, 59, 92, 0.4);
-        opacity: 0.4;
-    }
+    0%, 100% { text-shadow: 0 0 20px rgba(255, 59, 92, 0.6); opacity: 1; }
+    50% { text-shadow: 0 0 60px rgba(255, 59, 92, 1); opacity: 0.4; }
 }
 
-/* ===== Progress Bar ===== */
+/* ============================================
+   CARD STATE STYLES
+   ============================================ */
+
+.now-playing-card.state-playing {
+    border-color: rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
+}
+
+.now-playing-card.state-playing::before {
+    background: var(--gradient-accent);
+    animation: topBarPulse 2s ease-in-out infinite;
+}
+
+.now-playing-card.state-paused {
+    border-color: rgba(255, 193, 7, 0.3);
+}
+
+.now-playing-card.state-paused::before {
+    background: var(--gradient-warning);
+}
+
+.now-playing-card.state-stopped {
+    border-color: rgba(255, 59, 92, 0.3);
+}
+
+.now-playing-card.state-stopped::before {
+    background: var(--gradient-danger);
+}
+
+.now-playing-card.state-finished {
+    border-color: rgba(139, 148, 158, 0.2);
+}
+
+.now-playing-card.state-finished::before {
+    background: linear-gradient(135deg, #8b949e 0%, #6e7681 100%);
+}
+
+@keyframes topBarPulse {
+    0%, 100% { opacity: 1; width: 60%; }
+    50% { opacity: 0.7; width: 70%; }
+}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+
 .remote-progress {
     height: 6px;
     background: rgba(255, 255, 255, 0.08);
@@ -369,7 +506,7 @@ body::before {
     height: 100%;
     background: var(--gradient-accent);
     border-radius: 3px;
-    transition: width 0.15s linear;
+    transition: width 0.15s linear, background 0.3s;
     position: relative;
     box-shadow: 0 0 12px rgba(0, 255, 136, 0.5);
 }
@@ -385,6 +522,35 @@ body::before {
     background: #fff;
     border-radius: 50%;
     box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    transition: box-shadow 0.3s;
+}
+
+/* Progress bar state colors */
+.now-playing-card.state-paused .remote-progress-bar {
+    background: var(--gradient-warning);
+    box-shadow: 0 0 12px rgba(255, 193, 7, 0.5);
+}
+
+.now-playing-card.state-paused .remote-progress-bar::after {
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.6);
+}
+
+.now-playing-card.state-stopped .remote-progress-bar {
+    background: var(--gradient-danger);
+    box-shadow: 0 0 12px rgba(255, 59, 92, 0.5);
+}
+
+.now-playing-card.state-stopped .remote-progress-bar::after {
+    box-shadow: 0 0 10px rgba(255, 59, 92, 0.6);
+}
+
+.now-playing-card.state-finished .remote-progress-bar {
+    background: linear-gradient(135deg, #8b949e 0%, #6e7681 100%);
+    box-shadow: none;
+}
+
+.now-playing-card.state-finished .remote-progress-bar::after {
+    display: none;
 }
 
 .remote-time {
@@ -397,7 +563,10 @@ body::before {
     font-weight: 500;
 }
 
-/* ===== Seek Controls ===== */
+/* ============================================
+   SEEK CONTROLS
+   ============================================ */
+
 .seek-controls {
     display: flex;
     justify-content: center;
@@ -423,7 +592,10 @@ body::before {
     background: rgba(255, 255, 255, 0.1);
 }
 
-/* ===== Main Controls ===== */
+/* ============================================
+   MAIN CONTROLS
+   ============================================ */
+
 .remote-controls {
     display: flex;
     justify-content: center;
@@ -447,6 +619,12 @@ body::before {
     transform: scale(0.9);
 }
 
+/* Hidden state - для всех кнопок */
+.remote-btn.hidden {
+    display: none !important;
+}
+
+/* Secondary buttons (prev/next) */
 .remote-btn-secondary {
     width: 56px;
     height: 56px;
@@ -456,6 +634,11 @@ body::before {
     font-size: 1.3rem;
 }
 
+.remote-btn-secondary:active {
+    background: var(--remote-card-hover);
+}
+
+/* Primary Play/Pause button */
 .remote-btn-primary {
     width: 80px;
     height: 80px;
@@ -467,29 +650,37 @@ body::before {
 }
 
 .remote-btn-primary.playing {
-    background: var(--gradient-danger);
-    box-shadow: var(--glow-danger);
+    background: var(--gradient-warning);
+    box-shadow: var(--glow-warning);
 }
 
-.remote-btn-pause {
+.remote-btn-primary.can-resume {
+    animation: canResumePulse 2s ease-in-out infinite;
+}
+
+@keyframes canResumePulse {
+    0%, 100% { box-shadow: var(--glow-accent); }
+    50% { box-shadow: 0 0 60px rgba(0, 255, 136, 0.7), 0 0 100px rgba(0, 255, 136, 0.4); }
+}
+
+/* Stop button */
+.remote-btn-stop {
     width: 56px;
     height: 56px;
-    background: linear-gradient(135deg, #ffc107 0%, #ff9500 100%);
-    color: #000;
-    font-size: 1.2rem;
-    font-weight: bold;
+    background: var(--gradient-danger);
+    color: #fff;
+    font-size: 1.3rem;
+    box-shadow: 0 4px 15px rgba(255, 59, 92, 0.3);
 }
 
-.remote-btn-pause.paused {
-    animation: pauseGlow 1.5s ease-in-out infinite;
+.remote-btn-stop:active {
+    box-shadow: 0 0 25px rgba(255, 59, 92, 0.6);
 }
 
-@keyframes pauseGlow {
-    0%, 100% { box-shadow: 0 4px 15px rgba(255, 149, 0, 0.4); }
-    50% { box-shadow: 0 4px 25px rgba(255, 149, 0, 0.7); }
-}
+/* ============================================
+   NEXT UP CARD
+   ============================================ */
 
-/* ===== Next Up Card ===== */
 .next-up-card {
     background: var(--gradient-card), var(--remote-card);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -531,7 +722,10 @@ body::before {
     margin-left: var(--spacing-sm);
 }
 
-/* ===== Playlist ===== */
+/* ============================================
+   PLAYLIST
+   ============================================ */
+
 .remote-playlist {
     flex: 1;
     min-height: 150px;
@@ -655,7 +849,10 @@ body::before {
     margin-top: 2px;
 }
 
-/* ===== Volume Control ===== */
+/* ============================================
+   VOLUME CONTROL
+   ============================================ */
+
 .volume-card {
     background: var(--gradient-card), var(--remote-card);
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -716,7 +913,10 @@ body::before {
     font-weight: 600;
 }
 
-/* ===== Connection Info ===== */
+/* ============================================
+   CONNECTION INFO
+   ============================================ */
+
 .connection-info {
     font-size: 0.75rem;
     color: var(--remote-muted);
@@ -725,7 +925,10 @@ body::before {
     flex-shrink: 0;
 }
 
-/* ===== Responsive - Small screens ===== */
+/* ============================================
+   RESPONSIVE - SMALL SCREENS
+   ============================================ */
+
 @media (max-width: 360px) {
     .remote-timer {
         font-size: 3rem;
@@ -742,7 +945,7 @@ body::before {
     }
     
     .remote-btn-secondary,
-    .remote-btn-pause {
+    .remote-btn-stop {
         width: 50px;
         height: 50px;
         font-size: 1.1rem;
@@ -754,7 +957,10 @@ body::before {
     }
 }
 
-/* ===== Landscape Mode ===== */
+/* ============================================
+   LANDSCAPE MODE
+   ============================================ */
+
 @media (orientation: landscape) and (max-height: 500px) {
     .remote-container {
         flex-direction: row;
@@ -813,14 +1019,17 @@ body::before {
     }
     
     .remote-btn-secondary,
-    .remote-btn-pause {
+    .remote-btn-stop {
         width: 45px;
         height: 45px;
         font-size: 1rem;
     }
 }
 
-/* ===== Animation on load ===== */
+/* ============================================
+   ANIMATIONS ON LOAD
+   ============================================ */
+
 .now-playing-card,
 .remote-controls,
 .next-up-card,
@@ -844,236 +1053,4 @@ body::before {
         opacity: 1;
         transform: translateY(0);
     }
-}
-
-/* ============================================
-   PLAYBACK STATUS INDICATOR - NEW
-   ============================================ */
-
-.playback-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: var(--spacing-sm);
-    transition: all 0.3s ease;
-}
-
-.status-icon {
-    font-size: 0.9rem;
-}
-
-/* Status: Playing */
-.playback-status.status-playing {
-    background: rgba(0, 255, 136, 0.15);
-    color: var(--remote-accent);
-    box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
-    animation: statusPulseGreen 2s ease-in-out infinite;
-}
-
-@keyframes statusPulseGreen {
-    0%, 100% { 
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
-    }
-    50% { 
-        box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
-    }
-}
-
-/* Status: Paused */
-.playback-status.status-paused {
-    background: rgba(255, 193, 7, 0.15);
-    color: var(--remote-warning);
-    animation: statusPulseOrange 1.5s ease-in-out infinite;
-}
-
-@keyframes statusPulseOrange {
-    0%, 100% { 
-        opacity: 1;
-        box-shadow: 0 0 15px rgba(255, 193, 7, 0.2);
-    }
-    50% { 
-        opacity: 0.7;
-        box-shadow: 0 0 25px rgba(255, 193, 7, 0.4);
-    }
-}
-
-/* Status: Stopped (with position) */
-.playback-status.status-stopped {
-    background: rgba(255, 59, 92, 0.15);
-    color: var(--remote-danger);
-    box-shadow: 0 0 15px rgba(255, 59, 92, 0.2);
-}
-
-/* Status: Finished */
-.playback-status.status-finished {
-    background: rgba(139, 148, 158, 0.15);
-    color: var(--remote-muted);
-}
-
-/* Status: Ready */
-.playback-status.status-ready {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--remote-muted);
-}
-
-/* Position Indicator */
-.position-indicator {
-    display: none;
-    font-size: 0.85rem;
-    color: var(--remote-warning);
-    background: rgba(255, 193, 7, 0.1);
-    padding: 8px 16px;
-    border-radius: var(--radius-sm);
-    margin: var(--spacing-sm) 0;
-    font-weight: 500;
-    text-align: center;
-    border: 1px solid rgba(255, 193, 7, 0.2);
-}
-
-.state-stopped .position-indicator {
-    color: var(--remote-accent);
-    background: rgba(0, 255, 136, 0.1);
-    border-color: rgba(0, 255, 136, 0.2);
-}
-
-/* Card State Styles */
-.now-playing-card.state-playing {
-    border-color: rgba(0, 255, 136, 0.3);
-    box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
-}
-
-.now-playing-card.state-playing::before {
-    background: var(--gradient-accent);
-    animation: topBarPulse 2s ease-in-out infinite;
-}
-
-@keyframes topBarPulse {
-    0%, 100% { opacity: 1; width: 60%; }
-    50% { opacity: 0.7; width: 70%; }
-}
-
-.now-playing-card.state-paused {
-    border-color: rgba(255, 193, 7, 0.3);
-}
-
-.now-playing-card.state-paused::before {
-    background: linear-gradient(135deg, #ffc107 0%, #ff9500 100%);
-}
-
-.now-playing-card.state-stopped {
-    border-color: rgba(255, 59, 92, 0.3);
-}
-
-.now-playing-card.state-stopped::before {
-    background: var(--gradient-danger);
-}
-
-.now-playing-card.state-finished {
-    border-color: rgba(139, 148, 158, 0.2);
-}
-
-.now-playing-card.state-finished::before {
-    background: linear-gradient(135deg, #8b949e 0%, #6e7681 100%);
-}
-
-/* Timer State Styles */
-.remote-timer.playing {
-    color: var(--remote-accent);
-}
-
-.remote-timer.paused {
-    color: var(--remote-warning);
-    animation: timerPauseBlink 1.5s ease-in-out infinite;
-}
-
-@keyframes timerPauseBlink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.remote-timer.stopped {
-    color: var(--remote-danger);
-}
-
-.remote-timer.finished {
-    color: var(--remote-muted);
-    text-shadow: none;
-}
-
-/* Play button resume indicator */
-.remote-btn-primary.can-resume {
-    animation: canResumePulse 2s ease-in-out infinite;
-}
-
-@keyframes canResumePulse {
-    0%, 100% { 
-        box-shadow: var(--glow-accent);
-    }
-    50% { 
-        box-shadow: 0 0 50px rgba(0, 255, 136, 0.6), 0 0 80px rgba(0, 255, 136, 0.3);
-    }
-}
-
-/* Progress bar state colors */
-.state-paused .remote-progress-bar {
-    background: linear-gradient(135deg, #ffc107 0%, #ff9500 100%);
-    box-shadow: 0 0 12px rgba(255, 193, 7, 0.5);
-}
-
-.state-paused .remote-progress-bar::after {
-    box-shadow: 0 0 10px rgba(255, 193, 7, 0.6);
-}
-
-.state-stopped .remote-progress-bar {
-    background: linear-gradient(135deg, #ff3b5c 0%, #cc2244 100%);
-    box-shadow: 0 0 12px rgba(255, 59, 92, 0.5);
-}
-
-.state-stopped .remote-progress-bar::after {
-    box-shadow: 0 0 10px rgba(255, 59, 92, 0.6);
-}
-
-.state-finished .remote-progress-bar {
-    background: linear-gradient(135deg, #8b949e 0%, #6e7681 100%);
-    box-shadow: none;
-}
-
-.state-finished .remote-progress-bar::after {
-    display: none;
-}
-
-/* Stop button */
-.remote-btn-stop {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, #ff3b5c 0%, #cc2244 100%);
-    color: #fff;
-    font-size: 1.3rem;
-    border: none;
-    transition: all 0.2s ease;
-}
-
-.remote-btn-stop:active {
-    transform: scale(0.9);
-    box-shadow: 0 0 20px rgba(255, 59, 92, 0.5);
-}
-
-.remote-btn-stop.hidden {
-    display: none;
-}
-
-/* Play button when can resume */
-.remote-btn-primary.can-resume {
-    animation: canResumePulse 2s ease-in-out infinite;
-}
-
-@keyframes canResumePulse {
-    0%, 100% { box-shadow: var(--glow-accent); }
-    50% { box-shadow: 0 0 50px rgba(0, 255, 136, 0.6); }
 }
