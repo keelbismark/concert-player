@@ -8,7 +8,7 @@ class RemoteConnection {
         this.isRunning = false;
         this.ws = null;
         this.remoteUrl = '';
-        this.playerId = null;
+        this.playerId = localStorage.getItem('concertPlayerId');
         this.playerName = 'Concert Player';
         
         this.lastStateSent = 0;
@@ -87,6 +87,7 @@ class RemoteConnection {
             case 'registered':
                 this.playerId = data.playerId;
                 this.playerName = data.playerName;
+                localStorage.setItem('concertPlayerId', this.playerId);
                 console.log(`Registered as: ${data.playerName}`);
                 break;
             case 'pong':

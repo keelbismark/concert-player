@@ -255,8 +255,8 @@ server.listen(port, () => {
 ║   🎵 Concert Player Server v4.0            ║
 ║      Multi-room Edition                    ║
 ╠════════════════════════════════════════════╣
-║  Player: http://localhost:${port}              ║
-║  Remote: http://localhost:${port}/remote.html  ║
+║  Server is running on port ${port}             ║
+║  Access the player at the server's address.  ║
 ╚════════════════════════════════════════════╝
     `);
 });
