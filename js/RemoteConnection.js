@@ -140,8 +140,8 @@ class RemoteConnection {
                 this.app.play();
                 break;
                 
-            case 'stop':
-                this.app.stop(true);
+             case 'stop':
+                this.app.stopWithPosition();
                 break;
                 
             case 'pause':
@@ -258,15 +258,15 @@ class RemoteConnection {
 
     sendStateImmediate() {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-        
+
         this.lastStateSent = Date.now();
-        
+
         const track = this.app.playlist.getCurrent();
         const nextTrack = this.app.playlist.getNext();
         
         // Получаем правильную текущую позицию
         const currentTime = this.app.audioEngine.getCurrentTime();
-        
+
         const state = {
             type: 'state',
             playerId: this.playerId,
@@ -295,7 +295,7 @@ class RemoteConnection {
             })),
             playlistLength: this.app.playlist.length
         };
-    
+
         try {
             this.ws.send(JSON.stringify(state));
         } catch (error) {

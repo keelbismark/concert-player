@@ -28,11 +28,19 @@
     <div class="remote-container">
         <!-- Now Playing -->
         <div class="now-playing-card">
-            <div class="remote-track-label">Сейчас играет</div>
+            <!-- Status Badge -->
+            <div class="playback-status" id="playback-status">
+                <span class="status-icon" id="status-icon">○</span>
+                <span class="status-text" id="status-text">Готов</span>
+            </div>
+            
             <div class="remote-track-title" id="remote-track-title">—</div>
             <div class="remote-track-note" id="remote-track-note"></div>
             
             <div class="remote-timer" id="remote-timer">--:--</div>
+            
+            <!-- Position indicator for stopped state -->
+            <div class="position-indicator" id="position-indicator"></div>
             
             <div class="remote-progress">
                 <div class="remote-progress-bar" id="remote-progress"></div>
@@ -101,26 +109,22 @@
             this.baseReconnectDelay = 1000;
             this.heartbeatInterval = null;
             this.lastPong = Date.now();
+            this.lastState = null;
 
-            // КРИТИЧНО: Извлекаем playerId из URL параметра ?player=xxx
             this.targetPlayerId = this.getPlayerIdFromUrl();
             
             console.log('🎮 Remote initialized');
-            console.log('Target player from URL:', this.targetPlayerId || 'none (will show list)');
+            console.log('Target player from URL:', this.targetPlayerId || 'none');
 
             this.cacheElements();
             this.bindEvents();
             this.connect();
         }
 
-        // Извлекаем playerId из URL
         getPlayerIdFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const playerId = params.get('player');
-            if (playerId) {
-                return decodeURIComponent(playerId);
-            }
-            return null;
+            return playerId ? decodeURIComponent(playerId) : null;
         }
 
         cacheElements() {
@@ -151,7 +155,13 @@
                 playlistCount: document.getElementById('playlist-count'),
                 volumeSlider: document.getElementById('remote-volume'),
                 volumeValue: document.getElementById('remote-volume-value'),
-                volumeIcon: document.getElementById('remote-volume-icon')
+                volumeIcon: document.getElementById('remote-volume-icon'),
+                // New status elements
+                playbackStatus: document.getElementById('playback-status'),
+                statusIcon: document.getElementById('status-icon'),
+                statusText: document.getElementById('status-text'),
+                positionIndicator: document.getElementById('position-indicator'),
+                nowPlayingCard: document.querySelector('.now-playing-card')
             };
         }
 
@@ -175,7 +185,6 @@
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 
-                // Идентификация как remote
                 this.ws.send(JSON.stringify({ 
                     type: 'identify', 
                     clientType: 'remote'
@@ -283,7 +292,6 @@
             this.players = players;
             console.log('Player list:', players.length, 'players');
             
-            // Нет плееров
             if (!players.length) {
                 this.elements.playerList.innerHTML = `
                     <div class="no-players">
@@ -297,7 +305,6 @@
                 return;
             }
             
-            // КРИТИЧНО: Если есть целевой плеер из URL - подключаемся к нему автоматически
             if (this.targetPlayerId && !this.selectedPlayerId) {
                 const targetPlayer = players.find(p => p.id === this.targetPlayerId);
                 if (targetPlayer) {
@@ -310,14 +317,12 @@
                 }
             }
             
-            // Автовыбор если только один плеер и нет указанного в URL
             if (players.length === 1 && !this.selectedPlayerId && !this.targetPlayerId) {
                 console.log('Auto-selecting single player:', players[0].name);
                 this.selectPlayer(players[0].id);
                 return;
             }
             
-            // Если уже подключены к плееру который есть в списке
             if (this.selectedPlayerId) {
                 const stillExists = players.find(p => p.id === this.selectedPlayerId);
                 if (stillExists) {
@@ -329,7 +334,6 @@
                 }
             }
             
-            // Показываем список для ручного выбора
             this.elements.playerList.innerHTML = players.map(p => `
                 <div class="player-item ${p.id === this.selectedPlayerId ? 'selected' : ''}" 
                      data-player-id="${p.id}">
@@ -371,11 +375,98 @@
                             status === 'disconnected' ? '✕ Отключено' : '⟳ Подключение...';
         }
 
+        /**
+         * Determine playback state
+         */
+        getPlaybackState(isPlaying, isPaused, currentTime, duration) {
+            if (isPlaying && !isPaused) {
+                return 'playing';
+            }
+            if (isPaused) {
+                return 'paused';
+            }
+            if (duration > 0 && currentTime >= duration - 0.5) {
+                return 'finished';
+            }
+            if (currentTime > 0.5 && duration > 0) {
+                return 'stopped'; // Остановлено с сохранённой позицией
+            }
+            return 'ready';
+        }
+
+        /**
+         * Update playback status indicator
+         */
+        updatePlaybackStatus(state, currentTime, duration) {
+            const { statusIcon, statusText, playbackStatus, positionIndicator, nowPlayingCard, timer } = this.elements;
+            
+            // Remove all state classes
+            playbackStatus.className = 'playback-status';
+            nowPlayingCard.classList.remove('state-playing', 'state-paused', 'state-stopped', 'state-finished', 'state-ready');
+            timer.classList.remove('playing', 'paused', 'stopped', 'finished');
+            
+            switch (state) {
+                case 'playing':
+                    statusIcon.textContent = '▶';
+                    statusText.textContent = 'Воспроизведение';
+                    playbackStatus.classList.add('status-playing');
+                    nowPlayingCard.classList.add('state-playing');
+                    timer.classList.add('playing');
+                    positionIndicator.textContent = '';
+                    positionIndicator.style.display = 'none';
+                    break;
+                    
+                case 'paused':
+                    statusIcon.textContent = '⏸';
+                    statusText.textContent = 'Пауза';
+                    playbackStatus.classList.add('status-paused');
+                    nowPlayingCard.classList.add('state-paused');
+                    timer.classList.add('paused');
+                    positionIndicator.textContent = `Позиция: ${this.formatTime(currentTime)}`;
+                    positionIndicator.style.display = 'block';
+                    break;
+                    
+                case 'stopped':
+                    statusIcon.textContent = '⏹';
+                    statusText.textContent = 'Остановлено';
+                    playbackStatus.classList.add('status-stopped');
+                    nowPlayingCard.classList.add('state-stopped');
+                    timer.classList.add('stopped');
+                    positionIndicator.textContent = `▶ Продолжить с ${this.formatTime(currentTime)}`;
+                    positionIndicator.style.display = 'block';
+                    break;
+                    
+                case 'finished':
+                    statusIcon.textContent = '✓';
+                    statusText.textContent = 'Завершён';
+                    playbackStatus.classList.add('status-finished');
+                    nowPlayingCard.classList.add('state-finished');
+                    timer.classList.add('finished');
+                    positionIndicator.textContent = '';
+                    positionIndicator.style.display = 'none';
+                    break;
+                    
+                default: // ready
+                    statusIcon.textContent = '○';
+                    statusText.textContent = 'Готов';
+                    playbackStatus.classList.add('status-ready');
+                    nowPlayingCard.classList.add('state-ready');
+                    positionIndicator.textContent = '';
+                    positionIndicator.style.display = 'none';
+            }
+        }
+
         updateUI(state) {
+            this.lastState = state;
+            
             const { 
                 currentTrack, nextTrack, duration = 0, currentTime = 0, 
                 volume, playlist, playlistLength, isPlaying, isPaused 
             } = state;
+
+            // Determine and update playback state
+            const playbackState = this.getPlaybackState(isPlaying, isPaused, currentTime, duration);
+            this.updatePlaybackStatus(playbackState, currentTime, duration);
 
             // Track info
             this.elements.trackTitle.textContent = currentTrack?.title || '—';
@@ -387,7 +478,7 @@
             this.elements.timer.textContent = this.formatTime(remaining);
             this.elements.timeCurrent.textContent = this.formatTime(currentTime);
             
-            // Warning classes
+            // Warning classes for timer (only when playing)
             this.elements.timer.classList.remove('warning', 'critical');
             if (isPlaying && !isPaused && remaining > 0) {
                 if (remaining <= 5) {
@@ -401,22 +492,31 @@
             const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
             this.elements.progress.style.width = `${progress}%`;
 
-            // Play button
+            // Play button - changes based on state
             if (isPlaying) {
                 this.elements.playBtn.innerHTML = '⏹';
                 this.elements.playBtn.classList.add('playing');
-            } else {
+                this.elements.playBtn.title = 'Стоп';
+            } else if (playbackState === 'stopped' || playbackState === 'paused') {
                 this.elements.playBtn.innerHTML = '▶';
                 this.elements.playBtn.classList.remove('playing');
+                this.elements.playBtn.classList.add('can-resume');
+                this.elements.playBtn.title = 'Продолжить';
+            } else {
+                this.elements.playBtn.innerHTML = '▶';
+                this.elements.playBtn.classList.remove('playing', 'can-resume');
+                this.elements.playBtn.title = 'Воспроизвести';
             }
             
             // Pause button
             if (isPaused) {
                 this.elements.pauseBtn.innerHTML = '▶';
                 this.elements.pauseBtn.classList.add('paused');
+                this.elements.pauseBtn.title = 'Продолжить';
             } else {
                 this.elements.pauseBtn.innerHTML = '⏸';
                 this.elements.pauseBtn.classList.remove('paused');
+                this.elements.pauseBtn.title = 'Пауза';
             }
 
             // Next track
@@ -439,7 +539,7 @@
             if (Array.isArray(playlist)) {
                 const currentIdx = currentTrack?.index;
                 this.elements.playlistItems.innerHTML = playlist.map((t, i) => `
-                    <div class="remote-track-item ${i === currentIdx ? 'current playing' : ''}" 
+                    <div class="remote-track-item ${i === currentIdx ? 'current' : ''} ${i === currentIdx && isPlaying ? 'playing' : ''}" 
                          data-index="${t.index ?? i}">
                         <div class="remote-track-number">${i + 1}</div>
                         <div class="remote-track-info">
@@ -520,7 +620,7 @@
                 this.vibrate();
             };
 
-            // Volume с throttle
+            // Volume throttle
             let volumeThrottle = null;
             volumeSlider.oninput = (e) => {
                 const v = parseInt(e.target.value);

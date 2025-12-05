@@ -582,35 +582,29 @@ class ConcertPlayerApp {
 
     /**
      * Stop playback
-     * @param {boolean} withFade - use fade out
-     * @param {boolean} preservePosition - keep position for resume
      */
-    stop(withFade = true, preservePosition = false) {
+    stop(withFade = true) {
         const fadeOut = withFade ? this.settings.get('fadeOutDuration') : 0;
-
-        // Передаём preservePosition в audioEngine
-        this.audioEngine.stop(fadeOut, preservePosition);
-
+        this.audioEngine.stop(fadeOut); // без preservePosition - сброс в начало
+    
         // Update UI
         this.ui.updatePlayButton(false);
         this.ui.updatePauseButton(false);
         this.ui.renderPlaylist();
-
-        // Обновляем время - показываем сохранённую позицию или сбрасываем
+    
+        // Reset time display
         const track = this.playlist.getCurrent();
         if (track) {
-            const currentPos = preservePosition ? this.audioEngine.getCurrentTime() : 0;
             this.ui.updateTime({
-                currentTime: currentPos,
+                currentTime: 0,
                 duration: track.duration || 0,
-                remaining: (track.duration || 0) - currentPos,
-                progress: track.duration ? (currentPos / track.duration) * 100 : 0
+                remaining: track.duration || 0,
+                progress: 0
             });
         }
-
-    // Broadcast to remotes
-    this.broadcastState();
-}
+    
+        this.broadcastState();
+    }
 
     /**
      * Toggle play/stop
@@ -737,6 +731,35 @@ class ConcertPlayerApp {
             this.ui.renderPlaylist();
         }
 
+        this.broadcastState();
+    }
+
+    /**
+     * Stop but preserve position (for remote control)
+     */
+    stopWithPosition() {
+        const fadeOut = this.settings.get('fadeOutDuration') || 0;
+        
+        // Останавливаем с сохранением позиции
+        this.audioEngine.stop(fadeOut, true);
+    
+        // Update UI
+        this.ui.updatePlayButton(false);
+        this.ui.updatePauseButton(false);
+        this.ui.renderPlaylist();
+    
+        // Показываем сохранённую позицию
+        const track = this.playlist.getCurrent();
+        if (track) {
+            const currentPos = this.audioEngine.getCurrentTime();
+            this.ui.updateTime({
+                currentTime: currentPos,
+                duration: track.duration || 0,
+                remaining: (track.duration || 0) - currentPos,
+                progress: track.duration ? (currentPos / track.duration) * 100 : 0
+            });
+        }
+    
         this.broadcastState();
     }
 

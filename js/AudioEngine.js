@@ -27,11 +27,9 @@ class AudioEngine {
         this.isPlaying = false;
         this.isPaused = false;
         this.isLooping = false;
-        this.isStopped = false; // НОВОЕ: флаг ручной остановки
         
         this.startTime = 0;
         this.pausePosition = 0;
-        this.stoppedPosition = 0; // НОВОЕ: позиция при остановке
         this.playbackRate = 1;
         
         // Callbacks
@@ -45,7 +43,7 @@ class AudioEngine {
     /**
      * Resume audio context (required after user interaction)
      */
-    async resumeContext() {
+    async resume() {
         if (this.context.state === 'suspended') {
             await this.context.resume();
         }
@@ -108,9 +106,7 @@ class AudioEngine {
             if (this.isPlaying && !this.isLooping) {
                 this.isPlaying = false;
                 this.isPaused = false;
-                this.isStopped = false;
                 this.pausePosition = 0;
-                this.stoppedPosition = 0;
                 this.stopUpdates();
                 if (this.onEnded) this.onEnded();
             }
@@ -119,11 +115,9 @@ class AudioEngine {
         // Start playback
         this.currentSource.start(0, offset);
         this.startTime = this.context.currentTime - offset;
-        this.pausePosition = 0;
-        this.stoppedPosition = 0;
         this.isPlaying = true;
         this.isPaused = false;
-        this.isStopped = false;
+        // НЕ сбрасываем pausePosition здесь!
 
         this.startUpdates();
     }
@@ -131,12 +125,12 @@ class AudioEngine {
     /**
      * Stop playback with optional fade out
      * @param {number} fadeOut - fade out duration in seconds
-     * @param {boolean} preservePosition - whether to preserve position for resume
+     * @param {boolean} preservePosition - save position for resume (default: false)
      */
     stop(fadeOut = 0, preservePosition = false) {
         if (!this.currentSource && !this.isPaused) return;
 
-        // Сохраняем текущую позицию ДО остановки
+        // Сохраняем позицию ДО остановки
         const currentPos = this.getCurrentTime();
 
         const doStop = () => {
@@ -145,15 +139,11 @@ class AudioEngine {
             this.isPaused = false;
             this.stopUpdates();
             
-            if (preservePosition) {
-                // Сохраняем позицию для возможного продолжения
-                this.isStopped = true;
-                this.stoppedPosition = currentPos;
+            if (preservePosition && currentPos > 0) {
+                // Сохраняем позицию для продолжения
                 this.pausePosition = currentPos;
             } else {
                 // Полный сброс
-                this.isStopped = false;
-                this.stoppedPosition = 0;
                 this.pausePosition = 0;
             }
         };
@@ -178,30 +168,7 @@ class AudioEngine {
         this.cleanup();
         this.isPlaying = false;
         this.isPaused = true;
-        this.isStopped = false;
         this.stopUpdates();
-    }
-
-    /**
-     * Resume from pause or stopped state
-     */
-    resume() {
-        // Сначала проверяем контекст
-        if (this.context.state === 'suspended') {
-            this.context.resume();
-        }
-        
-        // Если на паузе или остановлено с сохранённой позицией
-        if ((this.isPaused || this.isStopped) && this.currentBuffer) {
-            const offset = this.pausePosition || this.stoppedPosition || 0;
-            
-            this.play(this.currentBuffer, {
-                offset: offset,
-                loop: this.isLooping,
-                playbackRate: this.playbackRate,
-                onEnded: this.onEnded
-            });
-        }
     }
 
     /**
@@ -226,9 +193,8 @@ class AudioEngine {
             this.isPlaying = false;
             this.play(buffer, options);
         } else {
-            // Если не играет - сохраняем позицию
+            // Сохраняем позицию для следующего play
             this.pausePosition = clampedPosition;
-            this.stoppedPosition = clampedPosition;
         }
     }
 
@@ -275,14 +241,8 @@ class AudioEngine {
         if (this.isPlaying) {
             return (this.context.currentTime - this.startTime) * this.playbackRate;
         }
-        if (this.isPaused) {
-            return this.pausePosition;
-        }
-        if (this.isStopped) {
-            return this.stoppedPosition;
-        }
-        // Возвращаем сохранённую позицию если есть
-        return this.pausePosition || this.stoppedPosition || 0;
+        // Для паузы, остановки - возвращаем сохранённую позицию
+        return this.pausePosition || 0;
     }
 
     /**
@@ -359,15 +319,6 @@ class AudioEngine {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
         }
-    }
-
-    /**
-     * Reset position to beginning
-     */
-    resetPosition() {
-        this.pausePosition = 0;
-        this.stoppedPosition = 0;
-        this.isStopped = false;
     }
 
     /**
