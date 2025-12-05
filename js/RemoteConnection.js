@@ -1,6 +1,6 @@
 /**
  * Remote Control Connection using WebSockets
- * Version 5.3 - Fixed WSS detection
+ * Version 5.4 - Fixed seek and stop from remote
  */
 class RemoteConnection {
     constructor(app) {
@@ -47,15 +47,12 @@ class RemoteConnection {
         }
 
         try {
-            // ========== ИСПРАВЛЕНИЕ ЗДЕСЬ ==========
-            // Определяем протокол WebSocket на основе протокола страницы
             const isSecure = window.location.protocol === 'https:';
             const wsProtocol = isSecure ? 'wss:' : 'ws:';
             const wsUrl = `${wsProtocol}//${window.location.host}`;
             
             console.log('Page protocol:', window.location.protocol);
             console.log('WebSocket URL:', wsUrl);
-            // ========================================
             
             this.ws = new WebSocket(wsUrl);
 
@@ -144,7 +141,7 @@ class RemoteConnection {
                 break;
                 
             case 'stop':
-                this.app.stop();
+                this.app.stop(true);
                 break;
                 
             case 'pause':
@@ -173,16 +170,13 @@ class RemoteConnection {
                 
             case 'seek':
                 if (typeof data.position === 'number') {
-                    this.app.audioEngine.seek(data.position);
+                    this.handleSeek(data.position);
                 }
                 break;
                 
             case 'seek-relative':
                 if (typeof data.delta === 'number') {
-                    const current = this.app.audioEngine.getCurrentTime();
-                    const duration = this.app.playlist.getCurrent()?.duration || 0;
-                    const newPos = Math.max(0, Math.min(duration, current + data.delta));
-                    this.app.audioEngine.seek(newPos);
+                    this.handleSeekRelative(data.delta);
                 }
                 break;
                 
@@ -190,6 +184,63 @@ class RemoteConnection {
                 this.sendStateImmediate();
                 break;
         }
+    }
+
+    /**
+     * Handle seek command from remote
+     */
+    handleSeek(position) {
+        const track = this.app.playlist.getCurrent();
+        if (!track || !track.duration) return;
+        
+        const clampedPosition = Math.max(0, Math.min(track.duration - 0.1, position));
+        
+        if (this.app.audioEngine.isPaused) {
+            // На паузе - обновляем позицию паузы
+            this.app.audioEngine.pausePosition = clampedPosition;
+            
+            this.app.ui.updateTime({
+                currentTime: clampedPosition,
+                duration: track.duration,
+                remaining: track.duration - clampedPosition,
+                progress: (clampedPosition / track.duration) * 100
+            });
+        } else if (this.app.audioEngine.isPlaying) {
+            // Играет - делаем seek
+            this.app.audioEngine.seek(clampedPosition);
+        } else {
+            // Остановлено - сохраняем позицию для следующего play
+            this.app.audioEngine.pausePosition = clampedPosition;
+            
+            this.app.ui.updateTime({
+                currentTime: clampedPosition,
+                duration: track.duration,
+                remaining: track.duration - clampedPosition,
+                progress: (clampedPosition / track.duration) * 100
+            });
+        }
+        
+        this.sendStateImmediate();
+    }
+
+    /**
+     * Handle relative seek command from remote
+     */
+    handleSeekRelative(delta) {
+        const track = this.app.playlist.getCurrent();
+        if (!track || !track.duration) return;
+        
+        let currentPos;
+        if (this.app.audioEngine.isPaused) {
+            currentPos = this.app.audioEngine.pausePosition || 0;
+        } else if (this.app.audioEngine.isPlaying) {
+            currentPos = this.app.audioEngine.getCurrentTime();
+        } else {
+            currentPos = this.app.audioEngine.pausePosition || 0;
+        }
+        
+        const newPosition = Math.max(0, Math.min(track.duration - 0.1, currentPos + delta));
+        this.handleSeek(newPosition);
     }
 
     sendState() {
@@ -212,6 +263,16 @@ class RemoteConnection {
 
         const track = this.app.playlist.getCurrent();
         const nextTrack = this.app.playlist.getNext();
+        
+        // Получаем правильную текущую позицию
+        let currentTime;
+        if (this.app.audioEngine.isPaused) {
+            currentTime = this.app.audioEngine.pausePosition || 0;
+        } else if (this.app.audioEngine.isPlaying) {
+            currentTime = this.app.audioEngine.getCurrentTime();
+        } else {
+            currentTime = this.app.audioEngine.pausePosition || 0;
+        }
 
         const state = {
             type: 'state',
@@ -219,7 +280,7 @@ class RemoteConnection {
             playerName: this.playerName,
             isPlaying: this.app.audioEngine.isPlaying,
             isPaused: this.app.audioEngine.isPaused,
-            currentTime: this.app.audioEngine.getCurrentTime(),
+            currentTime: currentTime,
             duration: track?.duration || 0,
             volume: this.app.volume,
             currentTrack: track ? {

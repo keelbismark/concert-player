@@ -463,19 +463,25 @@ class ConcertPlayerApp {
      */
     updatePlaylistInfo() {
         const total = this.playlist.getTotalDuration();
-        
+
         // Total duration
         const totalEl = document.querySelector('#total-duration .footer-stat-value');
         if (totalEl) {
-            totalEl.textContent = Utils.formatTimeHMS(total);
+            totalEl.textContent = total > 0 ? Utils.formatTimeHMS(total) : '00:00:00';
         }
+
+        // Remaining duration - получаем текущую позицию воспроизведения
+        const currentPosition = this.audioEngine.isPlaying || this.audioEngine.isPaused 
+            ? this.audioEngine.getCurrentTime() 
+            : 0;
+        this.updateRemainingDuration(currentPosition);
 
         // End time calculation
         const endEl = document.querySelector('#end-time .footer-stat-value');
         if (endEl) {
             const startTimeStr = this.settings.get('concertStartTime');
             const startTime = Utils.parseTimeString(startTimeStr);
-            
+
             if (startTime && total > 0) {
                 const endTime = new Date(startTime.getTime() + total * 1000);
                 endEl.textContent = Utils.formatTimeHHMM(endTime);
@@ -491,13 +497,22 @@ class ConcertPlayerApp {
     updateRemainingDuration(currentPosition = 0) {
         const remainingEl = document.querySelector('#remaining-duration .footer-stat-value');
         if (!remainingEl) return;
-
-        const remaining = this.playlist.getRemainingDuration(currentPosition);
-        if (remaining > 0) {
-            remainingEl.textContent = Utils.formatTimeHMS(remaining);
-        } else {
+    
+        // Если плейлист пуст
+        if (this.playlist.isEmpty) {
             remainingEl.textContent = '--:--';
+            return;
         }
+        
+        // Если нет выбранного трека - показываем общую длительность
+        if (!this.playlist.hasSelection) {
+            const total = this.playlist.getTotalDuration();
+            remainingEl.textContent = total > 0 ? Utils.formatTimeHMS(total) : '--:--';
+            return;
+        }
+    
+        const remaining = this.playlist.getRemainingDuration(currentPosition);
+        remainingEl.textContent = remaining > 0 ? Utils.formatTimeHMS(remaining) : '00:00:00';
     }
 
     /**

@@ -11,6 +11,7 @@ class Playlist {
             select: [],
             load: []
         };
+        this.importedData = null;
     }
 
     /**
@@ -43,11 +44,14 @@ class Playlist {
         this.tracks.splice(index, 1);
 
         // Adjust current index
-        if (this.currentIndex >= this.tracks.length) {
+        if (this.tracks.length === 0) {
+            this.currentIndex = -1;
+        } else if (this.currentIndex >= this.tracks.length) {
             this.currentIndex = this.tracks.length - 1;
         } else if (this.currentIndex > index) {
             this.currentIndex--;
         } else if (this.currentIndex === index) {
+            // Удалили текущий трек - сбрасываем выбор
             this.currentIndex = -1;
         }
 
@@ -137,7 +141,7 @@ class Playlist {
      * Get current track
      */
     getCurrent() {
-        if (this.currentIndex < 0) return null;
+        if (this.currentIndex < 0 || this.currentIndex >= this.tracks.length) return null;
         return this.tracks[this.currentIndex];
     }
 
@@ -174,6 +178,7 @@ class Playlist {
     clear() {
         this.tracks = [];
         this.currentIndex = -1;
+        this.importedData = null;
         this.emit('change');
     }
 
@@ -188,6 +193,11 @@ class Playlist {
      * Get remaining duration from current track
      */
     getRemainingDuration(fromPosition = 0) {
+        // Если плейлист пуст или нет выбранного трека
+        if (this.tracks.length === 0 || this.currentIndex < 0) {
+            return 0;
+        }
+        
         let total = 0;
         for (let i = this.currentIndex; i < this.tracks.length; i++) {
             if (i === this.currentIndex) {
@@ -221,7 +231,7 @@ class Playlist {
      */
     filter(query) {
         const q = query.toLowerCase().trim();
-                if (!q) return this.tracks.map((_, i) => i);
+        if (!q) return this.tracks.map((_, i) => i);
 
         return this.tracks
             .map((track, index) => ({ track, index }))
@@ -318,6 +328,6 @@ class Playlist {
      * Check if has current selection
      */
     get hasSelection() {
-        return this.currentIndex >= 0;
+        return this.currentIndex >= 0 && this.currentIndex < this.tracks.length;
     }
 }
