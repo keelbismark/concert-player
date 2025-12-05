@@ -59,7 +59,6 @@
         <!-- Controls -->
         <div class="remote-controls">
             <button class="remote-btn remote-btn-secondary" id="remote-prev" title="Предыдущий">⏮</button>
-            <button class="remote-btn remote-btn-stop hidden" id="remote-stop" title="Стоп">⏹</button>
             <button class="remote-btn remote-btn-primary" id="remote-play" title="Play/Pause">▶</button>
             <button class="remote-btn remote-btn-secondary" id="remote-next" title="Следующий">⏭</button>
         </div>
@@ -143,7 +142,6 @@
                 timeCurrent: document.getElementById('remote-time-current'),
                 timeTotal: document.getElementById('remote-time-total'),
                 playBtn: document.getElementById('remote-play'),
-                stopBtn: document.getElementById('remote-stop'),
                 prevBtn: document.getElementById('remote-prev'),
                 nextBtn: document.getElementById('remote-next'),
                 seekBack30: document.getElementById('seek-back-30'),
@@ -429,10 +427,6 @@
                 }
             }
 
-            // Stop button - показываем только когда есть смысл останавливать
-            const showStop = isPlaying || playbackState === 'paused' || playbackState === 'stopped';
-            stopBtn.classList.toggle('hidden', !showStop);
-
             // Next track
             if (nextTrack) {
                 this.elements.nextUpTitle.textContent = nextTrack.title;
@@ -500,11 +494,6 @@
                 } else {
                     this.send('play');
                 }
-                this.vibrate();
-            };
-
-            stopBtn.onclick = () => {
-                this.send('stop');
                 this.vibrate();
             };
 
