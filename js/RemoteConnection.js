@@ -1,13 +1,12 @@
 /**
  * Remote Control Connection using WebSockets
- * Version 5.0 - Fixed Multi-room + QR with session ID
+ * Version 5.3 - Fixed WSS detection
  */
 class RemoteConnection {
     constructor(app) {
         this.app = app;
         this.isRunning = false;
         this.ws = null;
-        this.remoteUrl = '';
         this.playerId = localStorage.getItem('concertPlayerId') || this.generatePlayerId();
         this.playerName = localStorage.getItem('concertPlayerName') || this.generatePlayerName();
         
@@ -18,12 +17,14 @@ class RemoteConnection {
         this.heartbeatInterval = null;
         this.reconnectTimeout = null;
         
-        // Сохраняем ID сразу
         localStorage.setItem('concertPlayerId', this.playerId);
         localStorage.setItem('concertPlayerName', this.playerName);
         
-        // Формируем URL с playerId
-        this.updateRemoteUrl();
+        this.remoteUrl = this.buildRemoteUrl();
+        
+        console.log('RemoteConnection initialized');
+        console.log('Player ID:', this.playerId);
+        console.log('Remote URL:', this.remoteUrl);
     }
 
     generatePlayerId() {
@@ -35,11 +36,9 @@ class RemoteConnection {
         return names[Math.floor(Math.random() * names.length)] + ' Player';
     }
 
-    updateRemoteUrl() {
-        // КРИТИЧНО: URL должен содержать playerId для привязки к конкретному плееру
+    buildRemoteUrl() {
         const baseUrl = `${window.location.protocol}//${window.location.host}`;
-        this.remoteUrl = `${baseUrl}/remote.html?player=${encodeURIComponent(this.playerId)}`;
-        console.log('Remote URL updated:', this.remoteUrl);
+        return `${baseUrl}/remote.html?player=${encodeURIComponent(this.playerId)}`;
     }
 
     start() {
@@ -48,14 +47,20 @@ class RemoteConnection {
         }
 
         try {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}`;
+            // ========== ИСПРАВЛЕНИЕ ЗДЕСЬ ==========
+            // Определяем протокол WebSocket на основе протокола страницы
+            const isSecure = window.location.protocol === 'https:';
+            const wsProtocol = isSecure ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}`;
             
-            console.log('Connecting to:', wsUrl);
+            console.log('Page protocol:', window.location.protocol);
+            console.log('WebSocket URL:', wsUrl);
+            // ========================================
+            
             this.ws = new WebSocket(wsUrl);
 
             this.ws.onopen = () => {
-                console.log('WebSocket connected');
+                console.log('✅ WebSocket connected');
                 
                 this.ws.send(JSON.stringify({
                     type: 'identify',
@@ -65,6 +70,7 @@ class RemoteConnection {
                 }));
                 
                 this.isRunning = true;
+                this.app.ui?.showToast?.('Remote control подключён', 'success');
                 this.startStateBroadcast();
                 
                 setTimeout(() => this.sendStateImmediate(), 100);
@@ -80,7 +86,7 @@ class RemoteConnection {
             };
 
             this.ws.onclose = (event) => {
-                console.log('WebSocket closed:', event.code);
+                console.log('WebSocket closed:', event.code, event.reason);
                 this.isRunning = false;
                 this.stopStateBroadcast();
                 
@@ -93,6 +99,7 @@ class RemoteConnection {
             };
 
             return { success: true, url: this.remoteUrl };
+            
         } catch (err) {
             console.error('Failed to start:', err);
             return { success: false, error: err.message };
@@ -117,13 +124,16 @@ class RemoteConnection {
 
         switch (data.type) {
             case 'registered':
-                this.playerId = data.playerId;
-                this.playerName = data.playerName;
-                localStorage.setItem('concertPlayerId', this.playerId);
-                localStorage.setItem('concertPlayerName', this.playerName);
-                this.updateRemoteUrl();
-                console.log(`Registered as: ${data.playerName} (${data.playerId})`);
-                this.app.ui?.showToast?.(`Remote: ${data.playerName}`, 'success');
+                if (data.playerId && data.playerId !== this.playerId) {
+                    this.playerId = data.playerId;
+                    localStorage.setItem('concertPlayerId', this.playerId);
+                    this.remoteUrl = this.buildRemoteUrl();
+                }
+                if (data.playerName) {
+                    this.playerName = data.playerName;
+                    localStorage.setItem('concertPlayerName', this.playerName);
+                }
+                console.log(`Registered as: ${this.playerName} (${this.playerId})`);
                 break;
                 
             case 'pong':
@@ -278,14 +288,14 @@ class RemoteConnection {
         if (!this.isRunning) {
             this.start();
         }
-
-        // Небольшая задержка для обновления URL после регистрации
-        setTimeout(() => this._createModal(), 300);
+        setTimeout(() => this._createModal(), 200);
     }
 
     _createModal() {
         const existing = document.getElementById('remote-modal');
         if (existing) existing.remove();
+
+        this.remoteUrl = this.buildRemoteUrl();
 
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
@@ -300,7 +310,7 @@ class RemoteConnection {
                     <button class="modal-close" id="remote-modal-close">✕</button>
                 </div>
                 <div class="modal-body">
-                    <div class="player-info" style="text-align: center; margin-bottom: 16px;">
+                    <div style="text-align: center; margin-bottom: 16px;">
                         <div style="font-size: 1.1rem; color: #00ff88;">🎵 ${this.playerName}</div>
                         <div style="font-size: 0.7rem; color: #666; margin-top: 4px; font-family: monospace;">
                             ID: ${this.playerId.slice(-12)}
@@ -308,31 +318,22 @@ class RemoteConnection {
                     </div>
                     
                     <div class="qr-container">
-                        <div class="qr-glow"></div>
                         <canvas id="qr-canvas" style="border-radius: 8px;"></canvas>
                     </div>
                     
-                    <p class="qr-instruction">
-                        Отсканируйте QR-код камерой телефона
-                    </p>
+                    <p class="qr-instruction">Отсканируйте QR-код камерой телефона</p>
                     
                     <div class="qr-url-container">
-                        <input type="text" 
-                               id="remote-url-input"
-                               value="${this.remoteUrl}" 
-                               readonly 
-                               onclick="this.select()"
-                               style="font-size: 0.75rem;">
-                        <button id="copy-url-btn" class="copy-btn" title="Копировать">📋</button>
+                        <input type="text" id="remote-url-input" value="${this.remoteUrl}" 
+                               readonly onclick="this.select()" style="font-size: 0.7rem;">
+                        <button id="copy-url-btn" class="copy-btn">📋</button>
                     </div>
                     
-                    <button id="open-remote-btn" class="qr-open-btn">
-                        🔗 Открыть в новой вкладке
-                    </button>
+                    <button id="open-remote-btn" class="qr-open-btn">🔗 Открыть в новой вкладке</button>
                     
                     <div class="qr-status">
                         <span class="status-dot ${this.isRunning ? 'active' : ''}"></span>
-                        <span>${this.isRunning ? 'Сервер активен' : 'Подключение...'}</span>
+                        <span>${this.isRunning ? 'Подключено' : 'Подключение...'}</span>
                     </div>
                 </div>
             </div>
@@ -341,104 +342,66 @@ class RemoteConnection {
         document.body.appendChild(modal);
         this._generateQR();
 
-        const closeModal = () => {
-            modal.classList.add('closing');
-            setTimeout(() => modal.remove(), 200);
+        document.getElementById('remote-modal-close').onclick = () => {
+            modal.remove();
         };
-
-        document.getElementById('remote-modal-close').addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) closeModal();
-        });
-
-        document.getElementById('copy-url-btn').addEventListener('click', () => {
-            navigator.clipboard.writeText(this.remoteUrl).then(() => {
-                const btn = document.getElementById('copy-url-btn');
-                btn.textContent = '✓';
-                setTimeout(() => { btn.textContent = '📋'; }, 2000);
-                this.app.ui?.showToast?.('Ссылка скопирована', 'success');
-            });
-        });
-
-        document.getElementById('open-remote-btn').addEventListener('click', () => {
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
+        document.getElementById('copy-url-btn').onclick = () => {
+            navigator.clipboard.writeText(this.remoteUrl);
+            document.getElementById('copy-url-btn').textContent = '✓';
+            setTimeout(() => document.getElementById('copy-url-btn').textContent = '📋', 2000);
+        };
+        document.getElementById('open-remote-btn').onclick = () => {
             window.open(this.remoteUrl, '_blank');
-        });
+        };
     }
 
     _generateQR() {
         const canvas = document.getElementById('qr-canvas');
         if (!canvas) return;
 
-        console.log('Generating QR for:', this.remoteUrl);
-
         try {
-            // Используем библиотеку qrcode-generator
-            if (typeof qrcode === 'function') {
-                const qr = qrcode(0, 'M');
-                qr.addData(this.remoteUrl);
-                qr.make();
-                
-                const ctx = canvas.getContext('2d');
-                const size = 200;
-                canvas.width = size;
-                canvas.height = size;
-                
-                const moduleCount = qr.getModuleCount();
-                const tileSize = size / moduleCount;
-                
-                // Белый фон
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, size, size);
-                
-                // Модули QR
-                for (let row = 0; row < moduleCount; row++) {
-                    for (let col = 0; col < moduleCount; col++) {
-                        if (qr.isDark(row, col)) {
-                            // Определяем цвет (акцент для finder patterns)
-                            const isFinderPattern = 
-                                (row < 7 && col < 7) || 
-                                (row < 7 && col >= moduleCount - 7) || 
-                                (row >= moduleCount - 7 && col < 7);
-                            
-                            ctx.fillStyle = isFinderPattern ? '#00ff88' : '#1a1d24';
-                            
-                            ctx.fillRect(
-                                Math.floor(col * tileSize),
-                                Math.floor(row * tileSize),
-                                Math.ceil(tileSize),
-                                Math.ceil(tileSize)
-                            );
-                        }
+            if (typeof qrcode !== 'function') {
+                throw new Error('QR library not loaded');
+            }
+
+            const qr = qrcode(0, 'M');
+            qr.addData(this.remoteUrl);
+            qr.make();
+            
+            const ctx = canvas.getContext('2d');
+            const size = 200;
+            canvas.width = size;
+            canvas.height = size;
+            
+            const moduleCount = qr.getModuleCount();
+            const tileSize = size / moduleCount;
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+            
+            for (let row = 0; row < moduleCount; row++) {
+                for (let col = 0; col < moduleCount; col++) {
+                    if (qr.isDark(row, col)) {
+                        const isFinderPattern = 
+                            (row < 7 && col < 7) || 
+                            (row < 7 && col >= moduleCount - 7) || 
+                            (row >= moduleCount - 7 && col < 7);
+                        
+                        ctx.fillStyle = isFinderPattern ? '#00cc6a' : '#1a1d24';
+                        ctx.fillRect(
+                            Math.floor(col * tileSize),
+                            Math.floor(row * tileSize),
+                            Math.ceil(tileSize),
+                            Math.ceil(tileSize)
+                        );
                     }
                 }
-                
-                // Логотип по центру
-                const logoSize = size * 0.15;
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(size/2 - logoSize, size/2 - logoSize/2, logoSize * 2, logoSize);
-                ctx.font = `${logoSize * 0.8}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('🎵', size/2, size/2);
-                
-                console.log('QR generated successfully');
-            } else {
-                throw new Error('qrcode library not loaded');
             }
         } catch (e) {
-            console.error('QR generation failed:', e);
-            const ctx = canvas.getContext('2d');
-            canvas.width = 200;
-            canvas.height = 200;
-            ctx.fillStyle = '#1a1d24';
-            ctx.fillRect(0, 0, 200, 200);
-            ctx.fillStyle = '#ff4444';
-            ctx.font = '14px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('QR Error', 100, 95);
-            ctx.fillStyle = '#888';
-            ctx.font = '10px Arial';
-            ctx.fillText(e.message, 100, 115);
+            console.error('QR error:', e);
         }
     }
 
