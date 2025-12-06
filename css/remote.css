@@ -42,9 +42,8 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html {
     height: 100%;
-    overflow: hidden;
 }
 
 body {
@@ -54,6 +53,9 @@ body {
     user-select: none;
     touch-action: manipulation;
     -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+    overflow-x: hidden;  /* Блокируем только горизонтальную */
+    overflow-y: auto;
 }
 
 body::before {
