@@ -1256,20 +1256,6 @@ body::before {
         0 0 10px rgba(255, 59, 92, 0.1);
 }
 
-/* Controls - свечение при воспроизведении */
-.remote-controls.playing {
-    box-shadow: 0 -2px 20px rgba(0, 255, 136, 0.15);
-}
-
-.remote-controls.paused {
-    box-shadow: 0 -2px 20px rgba(255, 193, 7, 0.15);
-}
-
-.remote-controls.critical {
-    box-shadow: 0 -2px 25px rgba(255, 59, 92, 0.2);
-    animation: controlsPulseCritical 0.3s ease-in-out infinite;
-}
-
 @keyframes controlsPulseCritical {
     0%, 100% { box-shadow: 0 -2px 20px rgba(255, 59, 92, 0.15); }
     50% { box-shadow: 0 -2px 35px rgba(255, 59, 92, 0.3); }
