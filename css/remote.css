@@ -1054,3 +1054,319 @@ body::before {
         transform: translateY(0);
     }
 }
+
+/* ============================================
+   REMOTE ENHANCEMENTS
+   Ambient Glow + Pulse Borders для пульта
+   ============================================ */
+
+/* Ambient Glow Background */
+.ambient-glow {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.ambient-glow.active {
+    opacity: 1;
+}
+
+.ambient-glow.playing {
+    box-shadow: 
+        inset 0 0 80px rgba(0, 255, 136, 0.12),
+        inset 0 0 150px rgba(0, 255, 136, 0.06);
+    animation: ambientPulseGreen 4s ease-in-out infinite;
+}
+
+@keyframes ambientPulseGreen {
+    0%, 100% {
+        box-shadow: 
+            inset 0 0 80px rgba(0, 255, 136, 0.12),
+            inset 0 0 150px rgba(0, 255, 136, 0.06);
+    }
+    50% {
+        box-shadow: 
+            inset 0 0 100px rgba(0, 255, 136, 0.18),
+            inset 0 0 200px rgba(0, 255, 136, 0.08);
+    }
+}
+
+.ambient-glow.paused {
+    box-shadow: 
+        inset 0 0 80px rgba(255, 193, 7, 0.12),
+        inset 0 0 150px rgba(255, 193, 7, 0.06);
+    animation: ambientPulsePaused 2s ease-in-out infinite;
+}
+
+@keyframes ambientPulsePaused {
+    0%, 100% {
+        box-shadow: 
+            inset 0 0 80px rgba(255, 193, 7, 0.12),
+            inset 0 0 150px rgba(255, 193, 7, 0.06);
+    }
+    50% {
+        box-shadow: 
+            inset 0 0 60px rgba(255, 193, 7, 0.08),
+            inset 0 0 100px rgba(255, 193, 7, 0.04);
+    }
+}
+
+.ambient-glow.warning {
+    box-shadow: 
+        inset 0 0 80px rgba(255, 193, 7, 0.15),
+        inset 0 0 150px rgba(255, 193, 7, 0.08);
+    animation: ambientPulseWarning 1s ease-in-out infinite;
+}
+
+@keyframes ambientPulseWarning {
+    0%, 100% {
+        box-shadow: 
+            inset 0 0 80px rgba(255, 193, 7, 0.15),
+            inset 0 0 150px rgba(255, 193, 7, 0.08);
+    }
+    50% {
+        box-shadow: 
+            inset 0 0 100px rgba(255, 193, 7, 0.2),
+            inset 0 0 180px rgba(255, 193, 7, 0.12);
+    }
+}
+
+.ambient-glow.critical {
+    box-shadow: 
+        inset 0 0 100px rgba(255, 59, 92, 0.2),
+        inset 0 0 200px rgba(255, 59, 92, 0.1);
+    animation: ambientPulseCritical 0.4s ease-in-out infinite;
+}
+
+@keyframes ambientPulseCritical {
+    0%, 100% {
+        box-shadow: 
+            inset 0 0 100px rgba(255, 59, 92, 0.2),
+            inset 0 0 200px rgba(255, 59, 92, 0.1);
+    }
+    50% {
+        box-shadow: 
+            inset 0 0 150px rgba(255, 59, 92, 0.3),
+            inset 0 0 250px rgba(255, 59, 92, 0.15);
+    }
+}
+
+.ambient-glow.stopped {
+    box-shadow: 
+        inset 0 0 50px rgba(139, 148, 158, 0.05),
+        inset 0 0 100px rgba(139, 148, 158, 0.02);
+    animation: none;
+}
+
+/* ============================================
+   PULSE BORDERS FOR CARDS
+   ============================================ */
+
+/* Now Playing Card - пульсация при воспроизведении */
+.now-playing-card.state-playing {
+    box-shadow: 
+        0 0 0 2px var(--remote-accent),
+        0 0 25px rgba(0, 255, 136, 0.3);
+    animation: cardPulsePlaying 2s ease-in-out infinite;
+}
+
+@keyframes cardPulsePlaying {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 1px var(--remote-accent),
+            0 0 15px rgba(0, 255, 136, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 2px var(--remote-accent),
+            0 0 30px rgba(0, 255, 136, 0.4);
+    }
+}
+
+/* Пауза - жёлтая пульсация */
+.now-playing-card.state-paused {
+    box-shadow: 
+        0 0 0 2px var(--remote-warning),
+        0 0 20px rgba(255, 193, 7, 0.25);
+    animation: cardPulsePaused 1.5s ease-in-out infinite;
+}
+
+@keyframes cardPulsePaused {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 1px var(--remote-warning),
+            0 0 15px rgba(255, 193, 7, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 2px var(--remote-warning),
+            0 0 25px rgba(255, 193, 7, 0.35);
+    }
+}
+
+/* Warning (<15 сек) */
+.now-playing-card.state-warning {
+    box-shadow: 
+        0 0 0 2px var(--remote-warning),
+        0 0 25px rgba(255, 193, 7, 0.3);
+    animation: cardPulseWarning 0.8s ease-in-out infinite;
+}
+
+@keyframes cardPulseWarning {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 2px var(--remote-warning),
+            0 0 20px rgba(255, 193, 7, 0.25);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 3px var(--remote-warning),
+            0 0 35px rgba(255, 193, 7, 0.45);
+    }
+}
+
+/* Critical (<5 сек) */
+.now-playing-card.state-critical {
+    box-shadow: 
+        0 0 0 3px var(--remote-danger),
+        0 0 30px rgba(255, 59, 92, 0.4);
+    animation: cardPulseCritical 0.3s ease-in-out infinite;
+}
+
+@keyframes cardPulseCritical {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 2px var(--remote-danger),
+            0 0 25px rgba(255, 59, 92, 0.35);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 4px var(--remote-danger),
+            0 0 45px rgba(255, 59, 92, 0.55);
+    }
+}
+
+/* Stopped */
+.now-playing-card.state-stopped {
+    box-shadow: 
+        0 0 0 1px rgba(255, 59, 92, 0.3),
+        0 0 10px rgba(255, 59, 92, 0.1);
+}
+
+/* Controls - свечение при воспроизведении */
+.remote-controls.playing {
+    box-shadow: 0 -2px 20px rgba(0, 255, 136, 0.15);
+}
+
+.remote-controls.paused {
+    box-shadow: 0 -2px 20px rgba(255, 193, 7, 0.15);
+}
+
+.remote-controls.critical {
+    box-shadow: 0 -2px 25px rgba(255, 59, 92, 0.2);
+    animation: controlsPulseCritical 0.3s ease-in-out infinite;
+}
+
+@keyframes controlsPulseCritical {
+    0%, 100% { box-shadow: 0 -2px 20px rgba(255, 59, 92, 0.15); }
+    50% { box-shadow: 0 -2px 35px rgba(255, 59, 92, 0.3); }
+}
+
+/* ============================================
+   SETLIST PROGRESS (мини-версия)
+   ============================================ */
+
+.setlist-mini {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--remote-card);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.setlist-mini-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.setlist-mini-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--remote-muted);
+}
+
+.setlist-mini-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.setlist-mini-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.setlist-mini-fill.tracks {
+    background: linear-gradient(90deg, #00d4aa, #00ff88);
+}
+
+.setlist-mini-fill.time {
+    background: linear-gradient(90deg, #0077b6, #00b4d8);
+}
+
+.setlist-mini-value {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--remote-text);
+    text-align: right;
+}
+
+.setlist-mini-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.setlist-mini-stat {
+    text-align: center;
+    min-width: 45px;
+}
+
+.setlist-mini-stat-value {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--remote-accent);
+}
+
+.setlist-mini-stat-value.end-time {
+    color: #00b4d8;
+}
+
+.setlist-mini-stat-label {
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--remote-muted);
+    margin-top: 2px;
+}
+
+/* Скрыть на очень маленьких экранах */
+@media (max-width: 320px) {
+    .setlist-mini {
+        display: none;
+    }
+}

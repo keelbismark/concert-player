@@ -7,9 +7,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#07080a">
     <title>Concert Remote</title>
-    <link rel="stylesheet" href="css/remote.css">
+    <link rel="stylesheet" href="/css/remote.css">
 </head>
 <body>
+
+    <!-- Ambient Glow Background -->
+    <div class="ambient-glow" id="ambient-glow"></div>
+
     <!-- Player Selector -->
     <div class="player-selector" id="player-selector">
         <h2>🎵 Выберите плеер</h2>
@@ -26,8 +30,32 @@
 
     <!-- Remote Container -->
     <div class="remote-container">
+    
+        <!-- Setlist Mini Progress -->
+        <div class="setlist-mini" id="setlist-mini">
+            <div class="setlist-mini-item">
+                <div class="setlist-mini-label">Треки</div>
+                <div class="setlist-mini-bar">
+                    <div class="setlist-mini-fill tracks" id="setlist-tracks-bar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="setlist-mini-value" id="setlist-tracks-text">0/0</div>
+            
+            <div class="setlist-mini-divider"></div>
+            
+            <div class="setlist-mini-stat">
+                <div class="setlist-mini-stat-value" id="setlist-remaining">0</div>
+                <div class="setlist-mini-stat-label">Осталось</div>
+            </div>
+            
+            <div class="setlist-mini-stat">
+                <div class="setlist-mini-stat-value end-time" id="setlist-end-time">--:--</div>
+                <div class="setlist-mini-stat-label">Конец</div>
+            </div>
+        </div>
+
         <!-- Now Playing -->
-        <div class="now-playing-card">
+        <div class="now-playing-card" id="now-playing-card">
             <div class="playback-status" id="playback-status">
                 <span class="status-icon" id="status-icon">○</span>
                 <span class="status-text" id="status-text">Готов</span>
@@ -57,8 +85,9 @@
         </div>
 
         <!-- Controls -->
-        <div class="remote-controls">
+        <div class="remote-controls" id="remote-controls">
             <button class="remote-btn remote-btn-secondary" id="remote-prev" title="Предыдущий">⏮</button>
+            <button class="remote-btn remote-btn-stop" id="remote-stop" title="Стоп">⏹</button>
             <button class="remote-btn remote-btn-primary" id="remote-play" title="Play/Pause">▶</button>
             <button class="remote-btn remote-btn-secondary" id="remote-next" title="Следующий">⏭</button>
         </div>
@@ -111,6 +140,7 @@
             this.targetPlayerId = this.getPlayerIdFromUrl();
             
             console.log('🎮 Remote initialized');
+            console.log('🎯 Target player:', this.targetPlayerId);
 
             this.cacheElements();
             this.bindEvents();
@@ -130,6 +160,7 @@
 
         cacheElements() {
             this.elements = {
+                // Existing
                 playerSelector: document.getElementById('player-selector'),
                 playerList: document.getElementById('player-list'),
                 refreshPlayers: document.getElementById('refresh-players'),
@@ -142,6 +173,7 @@
                 timeCurrent: document.getElementById('remote-time-current'),
                 timeTotal: document.getElementById('remote-time-total'),
                 playBtn: document.getElementById('remote-play'),
+                stopBtn: document.getElementById('remote-stop'),
                 prevBtn: document.getElementById('remote-prev'),
                 nextBtn: document.getElementById('remote-next'),
                 seekBack30: document.getElementById('seek-back-30'),
@@ -160,7 +192,16 @@
                 statusIcon: document.getElementById('status-icon'),
                 statusText: document.getElementById('status-text'),
                 positionIndicator: document.getElementById('position-indicator'),
-                nowPlayingCard: document.querySelector('.now-playing-card')
+                nowPlayingCard: document.getElementById('now-playing-card'),
+                
+                // NEW: Enhancements
+                ambientGlow: document.getElementById('ambient-glow'),
+                remoteControls: document.getElementById('remote-controls'),
+                setlistMini: document.getElementById('setlist-mini'),
+                setlistTracksBar: document.getElementById('setlist-tracks-bar'),
+                setlistTracksText: document.getElementById('setlist-tracks-text'),
+                setlistRemaining: document.getElementById('setlist-remaining'),
+                setlistEndTime: document.getElementById('setlist-end-time')
             };
         }
 
@@ -169,10 +210,12 @@
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}`;
             
+            console.log('🔌 Connecting to:', wsUrl);
+            
             try {
                 this.ws = new WebSocket(wsUrl);
             } catch (err) {
-                console.error('WebSocket error:', err);
+                console.error('WebSocket creation error:', err);
                 this.scheduleReconnect();
                 return;
             }
@@ -184,7 +227,8 @@
                 
                 this.ws.send(JSON.stringify({ 
                     type: 'identify', 
-                    clientType: 'remote'
+                    clientType: 'remote',
+                    targetPlayerId: this.targetPlayerId
                 }));
                 
                 this.updateStatus('connected');
@@ -193,20 +237,31 @@
 
             this.ws.onmessage = (event) => {
                 try {
-                    this.handleMessage(JSON.parse(event.data));
+                    const data = event.data;
+                    
+                    if (typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
+                        const message = JSON.parse(data);
+                        this.handleMessage(message);
+                    } else {
+                        console.log('Server text message:', data);
+                    }
                 } catch (e) {
-                    console.error('Parse error:', e);
+                    console.error('Message parse error:', e);
                 }
             };
 
-            this.ws.onclose = () => {
+            this.ws.onclose = (event) => {
+                console.log('WebSocket closed:', event.code, event.reason);
                 this.isConnected = false;
                 this.stopHeartbeat();
                 this.updateStatus('disconnected');
+                this.updateAmbientGlow('stopped');
                 this.scheduleReconnect();
             };
 
-            this.ws.onerror = () => console.error('WebSocket error');
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
         }
 
         scheduleReconnect() {
@@ -225,6 +280,7 @@
             this.heartbeatInterval = setInterval(() => {
                 if (this.ws?.readyState === WebSocket.OPEN) {
                     if (Date.now() - this.lastPong > 35000) {
+                        console.log('Heartbeat timeout, reconnecting...');
                         this.ws.close();
                         return;
                     }
@@ -247,24 +303,34 @@
                 case 'pong':
                     this.lastPong = Date.now();
                     break;
+                    
                 case 'player-list':
                     this.handlePlayerList(data.players);
                     break;
+                    
                 case 'player-selected':
                     this.selectedPlayerId = data.playerId;
                     this.selectedPlayerName = data.playerName;
                     this.hidePlayerSelector();
                     this.elements.connectionInfo.textContent = `🎵 ${data.playerName}`;
+                    // Активируем ambient glow
+                    this.elements.ambientGlow?.classList.add('active');
                     break;
+                    
                 case 'player-disconnected':
                     this.selectedPlayerId = null;
                     this.showPlayerSelector();
                     this.updateStatus('disconnected');
+                    this.updateAmbientGlow('stopped');
+                    this.elements.connectionInfo.textContent = 'Плеер отключился';
                     setTimeout(() => this.send('get-players'), 1000);
                     break;
+                    
                 case 'error':
+                    console.error('Server error:', data.message);
                     this.elements.connectionInfo.textContent = '⚠️ ' + data.message;
                     break;
+                    
                 case 'state':
                     this.updateUI(data);
                     break;
@@ -272,9 +338,9 @@
         }
 
         handlePlayerList(players) {
-            this.players = players;
+            this.players = players || [];
             
-            if (!players.length) {
+            if (!this.players.length) {
                 this.elements.playerList.innerHTML = `
                     <div class="no-players">
                         <p>😴 Нет доступных плееров</p>
@@ -288,24 +354,26 @@
             }
             
             if (this.targetPlayerId && !this.selectedPlayerId) {
-                const targetPlayer = players.find(p => p.id === this.targetPlayerId);
+                const targetPlayer = this.players.find(p => p.id === this.targetPlayerId);
                 if (targetPlayer) {
+                    console.log('🎯 Auto-connecting to target player:', targetPlayer.name);
                     this.selectPlayer(targetPlayer.id);
                     return;
                 }
             }
             
-            if (players.length === 1 && !this.selectedPlayerId) {
-                this.selectPlayer(players[0].id);
+            if (this.players.length === 1 && !this.selectedPlayerId) {
+                console.log('🎯 Auto-connecting to only player:', this.players[0].name);
+                this.selectPlayer(this.players[0].id);
                 return;
             }
             
-            if (this.selectedPlayerId && players.find(p => p.id === this.selectedPlayerId)) {
+            if (this.selectedPlayerId && this.players.find(p => p.id === this.selectedPlayerId)) {
                 this.hidePlayerSelector();
                 return;
             }
             
-            this.elements.playerList.innerHTML = players.map(p => `
+            this.elements.playerList.innerHTML = this.players.map(p => `
                 <div class="player-item" data-player-id="${p.id}">
                     <div class="player-name">🎵 ${p.name}</div>
                     <div class="player-status">${p.hasState ? '● Активен' : '○ Готов'}</div>
@@ -323,6 +391,7 @@
         }
 
         selectPlayer(id) {
+            console.log('Selecting player:', id);
             this.send('select-player', { playerId: id });
         }
 
@@ -341,9 +410,75 @@
                             status === 'disconnected' ? '✕ Отключено' : '⟳ Подключение...';
         }
 
-        getPlaybackState(isPlaying, isPaused, currentTime, duration) {
+        // NEW: Ambient Glow update
+        updateAmbientGlow(state) {
+            const glow = this.elements.ambientGlow;
+            if (!glow) return;
+            
+            glow.classList.remove('playing', 'paused', 'stopped', 'warning', 'critical');
+            glow.classList.add(state);
+        }
+
+        // NEW: Update controls state
+        updateControlsState(state) {
+            const controls = this.elements.remoteControls;
+            if (!controls) return;
+            
+            controls.classList.remove('playing', 'paused', 'critical');
+            if (state === 'playing') controls.classList.add('playing');
+            if (state === 'paused') controls.classList.add('paused');
+            if (state === 'critical') controls.classList.add('critical');
+        }
+
+        // NEW: Update setlist mini progress
+        updateSetlistMini(playlist, currentIndex, currentTime) {
+            if (!this.elements.setlistMini) return;
+            
+            const totalTracks = playlist?.length || 0;
+            const currentTrackNum = currentIndex >= 0 ? currentIndex + 1 : 0;
+            
+            // Прогресс треков
+            const tracksPercent = totalTracks > 0 ? (currentTrackNum / totalTracks) * 100 : 0;
+            if (this.elements.setlistTracksBar) {
+                this.elements.setlistTracksBar.style.width = `${tracksPercent}%`;
+            }
+            if (this.elements.setlistTracksText) {
+                this.elements.setlistTracksText.textContent = `${currentTrackNum}/${totalTracks}`;
+            }
+            
+            // Осталось треков
+            const remaining = Math.max(0, totalTracks - currentTrackNum);
+            if (this.elements.setlistRemaining) {
+                this.elements.setlistRemaining.textContent = remaining;
+            }
+            
+            // Расчёт времени окончания
+            if (this.elements.setlistEndTime && playlist) {
+                let remainingTime = 0;
+                playlist.forEach((track, i) => {
+                    if (i > currentIndex) {
+                        remainingTime += track.duration || 0;
+                    } else if (i === currentIndex) {
+                        remainingTime += Math.max(0, (track.duration || 0) - currentTime);
+                    }
+                });
+                
+                if (remainingTime > 0) {
+                    const endDate = new Date(Date.now() + remainingTime * 1000);
+                    this.elements.setlistEndTime.textContent = endDate.toLocaleTimeString('ru-RU', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                } else {
+                    this.elements.setlistEndTime.textContent = '--:--';
+                }
+            }
+        }
+
+        getPlaybackState(isPlaying, isPaused, isStopped, currentTime, duration) {
             if (isPlaying && !isPaused) return 'playing';
             if (isPaused) return 'paused';
+            if (isStopped) return 'stopped';
             if (duration > 0 && currentTime >= duration - 0.5) return 'finished';
             if (currentTime > 0.5 && duration > 0) return 'stopped';
             return 'ready';
@@ -353,13 +488,13 @@
             const { statusIcon, statusText, playbackStatus, positionIndicator, nowPlayingCard, timer } = this.elements;
             
             playbackStatus.className = 'playback-status';
-            nowPlayingCard.classList.remove('state-playing', 'state-paused', 'state-stopped', 'state-finished', 'state-ready');
+            nowPlayingCard.classList.remove('state-playing', 'state-paused', 'state-stopped', 'state-finished', 'state-ready', 'state-warning', 'state-critical');
             timer.classList.remove('playing', 'paused', 'stopped', 'finished');
             
             const states = {
                 playing: { icon: '▶', text: 'Воспроизведение', position: '' },
                 paused: { icon: '⏸', text: 'Пауза', position: `Позиция: ${this.formatTime(currentTime)}` },
-                stopped: { icon: '⏹', text: 'Остановлено', position: `▶ Продолжить с ${this.formatTime(currentTime)}` },
+                stopped: { icon: '⏹', text: 'Остановлено', position: currentTime > 0 ? `▶ Продолжить с ${this.formatTime(currentTime)}` : '' },
                 finished: { icon: '✓', text: 'Завершён', position: '' },
                 ready: { icon: '○', text: 'Готов', position: '' }
             };
@@ -379,11 +514,30 @@
             
             const { 
                 currentTrack, nextTrack, duration = 0, currentTime = 0, 
-                volume, playlist, playlistLength, isPlaying, isPaused 
+                volume, playlist, playlistLength, isPlaying, isPaused, isStopped 
             } = state;
 
-            const playbackState = this.getPlaybackState(isPlaying, isPaused, currentTime, duration);
+            const playbackState = this.getPlaybackState(isPlaying, isPaused, isStopped, currentTime, duration);
             this.updatePlaybackStatus(playbackState, currentTime);
+
+            // NEW: Determine ambient/pulse state
+            const remaining = Math.max(0, duration - currentTime);
+            let visualState = playbackState;
+            
+            if (isPlaying && !isPaused) {
+                if (remaining <= 5) {
+                    visualState = 'critical';
+                    this.elements.nowPlayingCard?.classList.add('state-critical');
+                } else if (remaining <= 15) {
+                    visualState = 'warning';
+                    this.elements.nowPlayingCard?.classList.add('state-warning');
+                }
+            }
+            
+            // NEW: Update enhancements
+            this.updateAmbientGlow(visualState);
+            this.updateControlsState(visualState);
+            this.updateSetlistMini(playlist, currentTrack?.index ?? -1, currentTime);
 
             // Track info
             this.elements.trackTitle.textContent = currentTrack?.title || '—';
@@ -391,15 +545,17 @@
             this.elements.timeTotal.textContent = this.formatTime(currentTrack?.duration);
 
             // Timer
-            const remaining = Math.max(0, duration - currentTime);
             this.elements.timer.textContent = this.formatTime(remaining);
             this.elements.timeCurrent.textContent = this.formatTime(currentTime);
             
-            // Warning classes
+            // Warning classes for timer
             this.elements.timer.classList.remove('warning', 'critical');
             if (isPlaying && !isPaused && remaining > 0) {
-                if (remaining <= 5) this.elements.timer.classList.add('critical');
-                else if (remaining <= 15) this.elements.timer.classList.add('warning');
+                if (remaining <= 5) {
+                    this.elements.timer.classList.add('critical');
+                } else if (remaining <= 15) {
+                    this.elements.timer.classList.add('warning');
+                }
             }
 
             // Progress
@@ -407,7 +563,7 @@
             this.elements.progress.style.width = `${progress}%`;
 
             // Play button
-            const { playBtn, stopBtn } = this.elements;
+            const { playBtn } = this.elements;
             
             if (isPlaying) {
                 playBtn.innerHTML = '⏸';
@@ -497,6 +653,13 @@
                 this.vibrate();
             };
 
+            if (stopBtn) {
+                stopBtn.onclick = () => {
+                    this.send('stop');
+                    this.vibrate();
+                };
+            }
+
             nextBtn.onclick = () => {
                 this.send('next');
                 this.vibrate();
@@ -541,7 +704,7 @@
                 }
             };
 
-            // Prevent zoom on double-tap
+            // Prevent zoom
             document.addEventListener('gesturestart', e => e.preventDefault());
             let lastTouch = 0;
             document.addEventListener('touchend', e => {
@@ -551,12 +714,16 @@
         }
 
         vibrate(ms = 30) {
-            navigator.vibrate?.(ms);
+            if (navigator.vibrate) {
+                navigator.vibrate(ms);
+            }
         }
         
         formatTime(s) {
             if (!s || !isFinite(s)) return '0:00';
-            return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+            const mins = Math.floor(s / 60);
+            const secs = Math.floor(s % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
         }
     }
 
