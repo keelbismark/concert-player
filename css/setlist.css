@@ -1,0 +1,138 @@
+/* ============================================
+   SETLIST PROGRESS
+   Прогресс всего сетлиста
+   ============================================ */
+
+.setlist-progress {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-muted);
+}
+
+.setlist-progress-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.setlist-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.setlist-progress-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+.setlist-progress-value {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.setlist-progress-bar {
+    height: 6px;
+    background: var(--bg-hover);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+.setlist-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+/* Прогресс треков - зелёный */
+.setlist-progress-fill.tracks {
+    background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Прогресс времени - синий */
+.setlist-progress-fill.time {
+    background: linear-gradient(90deg, #0077b6, #00b4d8);
+    box-shadow: 0 0 10px rgba(0, 180, 216, 0.4);
+}
+
+/* Разделитель */
+.setlist-progress-divider {
+    width: 1px;
+    height: 36px;
+    background: var(--border-muted);
+    flex-shrink: 0;
+}
+
+/* Статистика */
+.setlist-stats {
+    display: flex;
+    gap: 20px;
+    flex-shrink: 0;
+}
+
+.setlist-stat {
+    text-align: center;
+    min-width: 50px;
+}
+
+.setlist-stat-value {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    line-height: 1;
+}
+
+.setlist-stat-value.end-time {
+    color: var(--info);
+}
+
+.setlist-stat-label {
+    font-size: 0.6rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .setlist-progress {
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 10px 16px;
+    }
+    
+    .setlist-progress-item {
+        min-width: calc(50% - 10px);
+    }
+    
+    .setlist-progress-divider {
+        display: none;
+    }
+    
+    .setlist-stats {
+        width: 100%;
+        justify-content: space-around;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-muted);
+    }
+}
+
+/* Fullscreen - скрыть */
+body.fullscreen-mode .setlist-progress {
+    display: none;
+}

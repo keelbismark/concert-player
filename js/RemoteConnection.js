@@ -76,10 +76,18 @@ class RemoteConnection {
 
             this.ws.onmessage = (event) => {
                 try {
-                    const message = JSON.parse(event.data);
-                    this.handleMessage(message);
+                    const data = event.data;
+                    
+                    // Проверяем, что это JSON (начинается с { или [)
+                    if (typeof data === 'string' && (data.startsWith('{') || data.startsWith('['))) {
+                        const message = JSON.parse(data);
+                        this.handleMessage(message);
+                    } else {
+                        // Простые текстовые сообщения от сервера
+                        console.log('Server message:', data);
+                    }
                 } catch (error) {
-                    console.error('Parse error:', error);
+                    console.error('WebSocket message error:', error);
                 }
             };
 

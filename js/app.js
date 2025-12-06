@@ -35,10 +35,17 @@ class ConcertPlayerApp {
         this.dragDrop = null;
         this.remoteConnection = null;
         
-        // NEW: Additional modules
+        // Additional modules
         this.pageProtection = null;
-        this.cuePoints = null;
         this.dragDropPlaylist = null;
+
+        // ========== NEW: Enhancement modules ==========
+        this.ambientGlow = null;
+        this.setlistProgress = null;
+        this.timelineRuler = null;
+        this.quickActionsWheel = null;
+        this.pulseBorders = null;
+        // ==============================================
 
         // Initialize everything
         this.init();
@@ -76,21 +83,24 @@ class ConcertPlayerApp {
                 this.ui.renderPlaylist();
                 this.updatePlaylistInfo();
                 this.broadcastState();
-                
-                // NEW: Refresh drag & drop after playlist changes
+
+                // Refresh drag & drop after playlist changes
                 if (this.dragDropPlaylist) {
                     this.dragDropPlaylist.refresh();
                 }
+
+                // ========== NEW: Update setlist progress ==========
+                this.updateSetlistProgress();
+                // ==================================================
             });
-            
+
             this.playlist.on('select', (track) => {
                 this.onTrackSelect(track);
                 this.broadcastState();
-                
-                // NEW: Render cue points for selected track
-                if (this.cuePoints && track) {
-                    this.cuePoints.renderCues(track.id);
-                }
+
+                // ========== NEW: Update setlist progress ==========
+                this.updateSetlistProgress();
+                // ==================================================
             });
 
             // 9. Settings change listener
@@ -101,14 +111,16 @@ class ConcertPlayerApp {
             // 10. Start concert timer loop
             this.startConcertTimerLoop();
 
-            // 11. NEW: Initialize page protection (replaces old setupBeforeUnload)
+            // 11. Initialize page protection
             this.initPageProtection();
 
-            // 12. NEW: Initialize cue points manager
-            this.initCuePoints();
 
-            // 13. NEW: Initialize enhanced drag & drop for playlist
+            // 12. Initialize enhanced drag & drop for playlist
             this.initDragDropPlaylist();
+
+            // ========== NEW: 13. Initialize visual enhancements ==========
+            this.initEnhancements();
+            // ==============================================================
 
             // 14. Register service worker for PWA
             await this.registerServiceWorker();
@@ -116,7 +128,7 @@ class ConcertPlayerApp {
             // 15. Check for app install prompt
             this.setupInstallPrompt();
 
-            // 16. NEW: Check for session recovery
+            // 16. Check for session recovery
             await this.checkSessionRecovery();
 
             console.log('✅ Concert Player initialized successfully');
@@ -125,6 +137,59 @@ class ConcertPlayerApp {
             console.error('❌ Initialization error:', error);
         }
     }
+
+// ==================== VISUAL ENHANCEMENTS ====================
+
+/**
+ * Initialize visual enhancement modules
+ */
+initEnhancements() {
+    // Ambient Glow
+    if (typeof AmbientGlow !== 'undefined') {
+        this.ambientGlow = new AmbientGlow();
+        console.log('🌈 Ambient Glow initialized');
+    }
+    
+    // Setlist Progress
+    if (typeof SetlistProgress !== 'undefined') {
+        this.setlistProgress = new SetlistProgress();
+        console.log('📊 Setlist Progress initialized');
+    }
+    
+    // Timeline Ruler
+    if (typeof TimelineRuler !== 'undefined') {
+        this.timelineRuler = new TimelineRuler();
+        this.timelineRuler.setSeekCallback((time) => {
+            this.audioEngine.seek(time);
+        });
+        console.log('📏 Timeline Ruler initialized');
+    }
+    
+    // Quick Actions Wheel
+    if (typeof QuickActionsWheel !== 'undefined') {
+        this.quickActionsWheel = new QuickActionsWheel(this);
+        console.log('🎯 Quick Actions Wheel initialized');
+    }
+    
+    // Pulse Borders
+    if (typeof PulseBorders !== 'undefined') {
+        this.pulseBorders = new PulseBorders(this);
+        console.log('💫 Pulse Borders initialized');
+    }
+}
+
+/**
+ * Update setlist progress display
+ */
+updateSetlistProgress() {
+    if (!this.setlistProgress) return;
+    
+    const tracks = this.playlist.tracks || [];
+    const currentIndex = this.playlist.currentIndex;
+    const currentTime = this.audioEngine.getCurrentTime() || 0;
+    
+    this.setlistProgress.calculate(tracks, currentIndex, currentTime);
+}
 
     // ==================== NEW: PAGE PROTECTION ====================
 
@@ -162,47 +227,6 @@ class ConcertPlayerApp {
         return this.audioEngine.isPlaying || 
                !this.playlist.isEmpty || 
                this.hasUnsavedChanges;
-    }
-
-    // ==================== NEW: CUE POINTS ====================
-
-    /**
-     * Initialize cue points manager
-     */
-    initCuePoints() {
-        if (typeof CuePointsManager !== 'undefined') {
-            this.cuePoints = new CuePointsManager(this);
-            console.log('📍 Cue points manager initialized');
-            
-            // Add cue points button to UI
-            this.addCuePointsButton();
-        }
-    }
-
-    /**
-     * Add cue points management button to track context menu
-     */
-    addCuePointsButton() {
-        // This will be called when rendering playlist items
-        // The actual button is added in UI.renderPlaylist()
-    }
-
-    /**
-     * Show cue points modal for track
-     */
-    showCuePointsModal(trackId) {
-        if (this.cuePoints) {
-            this.cuePoints.showCueModal(trackId);
-        }
-    }
-
-    /**
-     * Add cue point at current position
-     */
-    addCueAtCurrentPosition() {
-        if (this.cuePoints) {
-            this.cuePoints.addCueAtCurrentPosition();
-        }
     }
 
     // ==================== NEW: ENHANCED DRAG & DROP ====================
@@ -432,6 +456,12 @@ class ConcertPlayerApp {
             }
         }
 
+        // ========== NEW: Ambient Glow toggle ==========
+        if (this.ambientGlow && typeof values.ambientGlow !== 'undefined') {
+            this.ambientGlow.toggle(values.ambientGlow);
+        }
+        // ==============================================
+
         // Re-render playlist for schedule changes
         this.ui.renderPlaylist();
     }
@@ -489,11 +519,6 @@ class ConcertPlayerApp {
                 
                 loadedCount++;
 
-                // NEW: Restore cue points if track was in a previous session
-                if (this.cuePoints) {
-                    this.cuePoints.renderCues(track.id);
-                }
-
             } catch (err) {
                 console.error('Failed to load audio:', file.name, err);
                 
@@ -518,6 +543,11 @@ class ConcertPlayerApp {
             this.ui.showToast(`Загружено: ${loadedCount} трек(ов)`, 'success');
         }
 
+        // NEW: Show ambient glow when adding first tracks
+        if (this.playlist.isEmpty && this.ambientGlow) {
+            this.ambientGlow.show();
+        }
+        
         this.updatePlaylistInfo();
         this.hasUnsavedChanges = true;
     }
@@ -540,7 +570,7 @@ class ConcertPlayerApp {
 
         // Select in playlist
         const track = this.playlist.select(index);
-        
+
         if (track) {
             this.ui.updateNowPlaying(track);
             this.ui.updateTime({
@@ -550,16 +580,17 @@ class ConcertPlayerApp {
                 progress: 0
             });
             this.ui.scrollToCurrentTrack();
-            
-            // NEW: Update cue points display
-            if (this.cuePoints) {
-                this.cuePoints.renderCues(track.id);
-            }
-            
-            // NEW: Update media session
+
+            // Update media session
             if (this.pageProtection) {
                 this.pageProtection.updateMediaSession(track);
             }
+
+            // ========== NEW: Update Timeline Ruler ==========
+            if (this.timelineRuler && track.duration) {
+                this.timelineRuler.setDuration(track.duration);
+            }
+            // ================================================
         }
     }
 
@@ -575,16 +606,32 @@ class ConcertPlayerApp {
         }
 
         const removed = this.playlist.remove(index);
-        
+
         if (removed) {
             if (wasCurrent) {
                 const newCurrent = this.playlist.getCurrent();
                 this.ui.updateNowPlaying(newCurrent);
             }
-            
+
             this.ui.showToast('Трек удалён', 'success');
             this.updatePlaylistInfo();
             this.hasUnsavedChanges = true;
+
+            // NEW: Hide ambient glow if playlist became empty
+            if (this.playlist.isEmpty) {
+                if (this.ambientGlow) {
+                    this.ambientGlow.hide();
+                }
+                if (this.pulseBorders) {
+                    this.pulseBorders.stop();
+                }
+                if (this.setlistProgress) {
+                    this.setlistProgress.reset();
+                }
+                if (this.timelineRuler) {
+                    this.timelineRuler.reset();
+                }
+            }
         }
     }
 
@@ -623,15 +670,35 @@ class ConcertPlayerApp {
 
         this.playlist.clear();
         this.ui.updateNowPlaying(null);
-        
+
         const searchInput = this.ui.elements.searchInput;
         if (searchInput) {
             searchInput.value = '';
         }
-        
+
         this.ui.showToast('Плейлист очищен', 'success');
         this.updatePlaylistInfo();
         this.hasUnsavedChanges = false;
+
+        // ========== NEW: Reset enhancements ==========
+        if (this.setlistProgress) {
+            this.setlistProgress.reset();
+        }
+
+        if (this.timelineRuler) {
+            this.timelineRuler.reset();
+        }
+        // =============================================
+
+            // NEW: Hide ambient glow when playlist is empty
+        if (this.ambientGlow) {
+            this.ambientGlow.hide();
+        }
+
+        // Stop pulse borders
+        if (this.pulseBorders) {
+            this.pulseBorders.stop();
+        }
     }
 
     /**
@@ -725,7 +792,7 @@ class ConcertPlayerApp {
         // Resume audio context (required after user interaction)
         this.audioEngine.resume();
     
-        // ВАЖНО: Получаем сохранённую позицию
+        // Get saved position
         const offset = this.audioEngine.pausePosition || 0;
         
         console.log('▶ Play from position:', offset);
@@ -754,9 +821,25 @@ class ConcertPlayerApp {
         this.ui.updatePauseButton(false);
         this.ui.renderPlaylist();
         
-        // NEW: Update media session
+        // ========== NEW: Initialize Timeline for this track ==========
+        if (this.timelineRuler && track.duration) {
+            this.timelineRuler.setDuration(track.duration);
+        }
+        
+        // Update Ambient Glow to playing state
+        if (this.ambientGlow) {
+            this.ambientGlow.setState('playing');
+        }
+        // =============================================================
+        
+        // Update media session
         if (this.pageProtection) {
             this.pageProtection.updateMediaSession(track);
+        }
+
+        // Start Pulse Borders
+        if (this.pulseBorders) {
+            this.pulseBorders.start();
         }
         
         // Broadcast to remotes
@@ -786,6 +869,17 @@ class ConcertPlayerApp {
             });
         }
 
+        // ========== NEW: Update Ambient Glow ==========
+        if (this.ambientGlow) {
+            this.ambientGlow.setState('stopped');
+        }
+        // ==============================================
+
+        // Stop Pulse Borders
+        if (this.pulseBorders) {
+            this.pulseBorders.stop();
+        }
+
         this.broadcastState();
     }
 
@@ -810,6 +904,18 @@ class ConcertPlayerApp {
             this.audioEngine.pause();
             this.ui.updatePauseButton(true);
             this.ui.updatePlayButton(false);
+
+            // Update Pulse Borders
+            if (this.pulseBorders) {
+                this.pulseBorders.setPaused(true);
+            }
+
+            // ========== NEW: Update Ambient Glow ==========
+            if (this.ambientGlow) {
+                this.ambientGlow.setState('paused');
+            }
+            // ==============================================
+
             this.broadcastState();
         }
     }
@@ -882,6 +988,16 @@ class ConcertPlayerApp {
     onTrackEnded() {
         this.ui.updatePlayButton(false);
         this.ui.updatePauseButton(false);
+
+        // Останавливаем пульсацию
+        if (this.pulseBorders) {
+            this.pulseBorders.stop();
+        }
+        
+        // Останавливаем ambient glow
+        if (this.ambientGlow) {
+            this.ambientGlow.hide();
+        }
 
         const mode = this.settings.get('playMode');
 
@@ -997,9 +1113,35 @@ class ConcertPlayerApp {
             currentItem.style.setProperty('--progress', `${data.progress}%`);
         }
 
+        // ========== NEW: Update enhancements ==========
+
+        // Ambient Glow - update based on remaining time
+        if (this.ambientGlow) {
+            const isPlaying = this.audioEngine.isPlaying;
+            const isPaused = this.audioEngine.isPaused;
+            this.ambientGlow.updateByTime(data.remaining, isPlaying, isPaused);
+        }
+
+        // Timeline Ruler - update progress
+        if (this.timelineRuler) {
+            this.timelineRuler.updateProgress(data.currentTime);
+        }
+
+        // Setlist Progress - update current time
+        if (this.setlistProgress) {
+            this.setlistProgress.updateCurrentTime(data.currentTime);
+        }
+
+        // ==================================================
+
         // Broadcast to remotes periodically
         if (this.remoteServer && this.remoteServer.isRunning) {
             this.remoteServer.sendState();
+        }
+
+        // Pulse Borders - update based on remaining time
+        if (this.pulseBorders) {
+            this.pulseBorders.updateByTime(data.remaining);
         }
     }
 
@@ -1225,11 +1367,6 @@ class ConcertPlayerApp {
             // Import settings if present
             if (data.settings) {
                 this.settings.update(data.settings);
-            }
-
-            // NEW: Import cue points if present
-            if (data.cuePoints && this.cuePoints) {
-                this.cuePoints.import(data.cuePoints);
             }
 
             // Import playlist metadata

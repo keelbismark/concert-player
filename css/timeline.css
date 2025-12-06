@@ -1,0 +1,155 @@
+/* ============================================
+   TIMELINE RULER
+   Линейка времени под прогресс-баром
+   ============================================ */
+
+.timeline-container {
+    padding: 0 24px 16px;
+}
+
+.timeline-ruler {
+    position: relative;
+    height: 24px;
+    margin-top: 8px;
+    user-select: none;
+}
+
+/* Трек */
+.timeline-track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.timeline-track:hover {
+    background: var(--bg-hover);
+}
+
+/* Прогресс */
+.timeline-progress {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+    border-radius: 4px;
+    transition: width 0.1s linear;
+    position: relative;
+}
+
+/* Ползунок */
+.timeline-progress::after {
+    content: '';
+    position: absolute;
+    right: -7px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    background: var(--text-primary);
+    border-radius: 50%;
+    box-shadow: 
+        0 0 10px var(--accent-glow),
+        0 2px 6px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.timeline-track:hover .timeline-progress::after {
+    opacity: 1;
+}
+
+/* Метки времени */
+.timeline-marks {
+    position: absolute;
+    top: 10px;
+    left: 0;
+    right: 0;
+    height: 14px;
+}
+
+.timeline-mark {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%);
+}
+
+.timeline-mark::before {
+    content: '';
+    width: 1px;
+    height: 4px;
+    background: var(--text-disabled);
+}
+
+.timeline-mark-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--text-disabled);
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+/* Major метки (минуты) */
+.timeline-mark.major::before {
+    height: 6px;
+    background: var(--text-muted);
+}
+
+.timeline-mark.major .timeline-mark-label {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Hover tooltip */
+.timeline-hover {
+    position: absolute;
+    top: -28px;
+    transform: translateX(-50%);
+    padding: 4px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
+    z-index: 10;
+    white-space: nowrap;
+}
+
+.timeline-hover::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--bg-elevated);
+}
+
+.timeline-track:hover .timeline-hover {
+    opacity: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .timeline-container {
+        padding: 0 16px 12px;
+    }
+    
+    .timeline-mark-label {
+        font-size: 0.55rem;
+    }
+    
+    /* Скрыть minor метки */
+    .timeline-mark:not(.major) {
+        display: none;
+    }
+}

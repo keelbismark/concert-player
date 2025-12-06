@@ -1,0 +1,165 @@
+/* ============================================
+   PULSE BORDERS
+   Границы панелей пульсируют в такт музыке
+   ============================================ */
+
+/* Пульсирующая рамка через box-shadow (не ломает layout) */
+
+/* Playlist Panel */
+.pulse-border-enabled.pulse-active .playlist-panel {
+    box-shadow: 
+        0 0 0 2px var(--accent-primary),
+        0 0 20px var(--accent-glow),
+        var(--shadow-lg);
+    animation: pulseBorderPlaylist 2s ease-in-out infinite;
+}
+
+/* Now Playing Panel */
+.pulse-border-enabled.pulse-active .now-playing-panel {
+    box-shadow: 
+        0 0 0 2px var(--accent-primary),
+        0 0 25px var(--accent-glow),
+        var(--shadow-lg);
+    animation: pulseBorderNowPlaying 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseBorderPlaylist {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 1px var(--accent-secondary),
+            0 0 10px var(--accent-glow),
+            var(--shadow-lg);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 2px var(--accent-primary),
+            0 0 25px var(--accent-glow),
+            var(--shadow-lg);
+    }
+}
+
+@keyframes pulseBorderNowPlaying {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 1px var(--accent-secondary),
+            0 0 15px var(--accent-glow),
+            var(--shadow-lg);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 3px var(--accent-primary),
+            0 0 35px var(--accent-glow),
+            var(--shadow-lg);
+    }
+}
+
+/* Мягкий режим */
+.pulse-border-enabled.pulse-mode-soft.pulse-active .playlist-panel,
+.pulse-border-enabled.pulse-mode-soft.pulse-active .now-playing-panel {
+    animation-duration: 3s;
+}
+
+/* Интенсивный режим */
+.pulse-border-enabled.pulse-mode-intense.pulse-active .now-playing-panel {
+    animation: none;
+    box-shadow: 
+        0 0 0 calc(1px + var(--pulse-intensity, 0) * 3px) var(--accent-primary),
+        0 0 calc(10px + var(--pulse-intensity, 0) * 30px) var(--accent-glow),
+        var(--shadow-lg);
+    transition: box-shadow 0.05s ease;
+}
+
+/* Rainbow режим */
+.pulse-border-enabled.pulse-mode-rainbow.pulse-active .playlist-panel,
+.pulse-border-enabled.pulse-mode-rainbow.pulse-active .now-playing-panel {
+    animation: pulseBorderRainbow 4s linear infinite;
+}
+
+@keyframes pulseBorderRainbow {
+    0%   { box-shadow: 0 0 0 2px #ff0000, 0 0 20px #ff000055, var(--shadow-lg); }
+    16%  { box-shadow: 0 0 0 2px #ff8800, 0 0 20px #ff880055, var(--shadow-lg); }
+    33%  { box-shadow: 0 0 0 2px #ffff00, 0 0 20px #ffff0055, var(--shadow-lg); }
+    50%  { box-shadow: 0 0 0 2px #00ff88, 0 0 20px #00ff8855, var(--shadow-lg); }
+    66%  { box-shadow: 0 0 0 2px #0088ff, 0 0 20px #0088ff55, var(--shadow-lg); }
+    83%  { box-shadow: 0 0 0 2px #8800ff, 0 0 20px #8800ff55, var(--shadow-lg); }
+    100% { box-shadow: 0 0 0 2px #ff0000, 0 0 20px #ff000055, var(--shadow-lg); }
+}
+
+/* Пауза - жёлтая пульсация */
+.pulse-border-enabled.pulse-paused .now-playing-panel {
+    animation: pulseBorderPaused 1.5s ease-in-out infinite !important;
+}
+
+@keyframes pulseBorderPaused {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 1px var(--warning),
+            0 0 10px var(--warning-glow),
+            var(--shadow-lg);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 2px var(--warning),
+            0 0 25px var(--warning-glow),
+            var(--shadow-lg);
+    }
+}
+
+/* Warning - когда мало времени (<15 сек) */
+.pulse-border-enabled.pulse-warning .now-playing-panel {
+    animation: pulseBorderWarning 1s ease-in-out infinite !important;
+}
+
+@keyframes pulseBorderWarning {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 2px var(--warning),
+            0 0 15px var(--warning-glow),
+            var(--shadow-lg);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 3px var(--warning),
+            0 0 35px var(--warning-glow),
+            var(--shadow-lg);
+    }
+}
+
+/* Critical - красная быстрая пульсация (<5 сек) */
+.pulse-border-enabled.pulse-critical .now-playing-panel {
+    animation: pulseBorderCritical 0.4s ease-in-out infinite !important;
+}
+
+@keyframes pulseBorderCritical {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 2px var(--danger),
+            0 0 20px var(--danger-glow),
+            var(--shadow-lg);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 4px var(--danger),
+            0 0 45px var(--danger-glow),
+            var(--shadow-lg);
+    }
+}
+
+/* Линия на контролах */
+.pulse-border-enabled.pulse-active #main-controls {
+    box-shadow: 0 -2px 20px var(--accent-glow);
+}
+
+.pulse-border-enabled.pulse-paused #main-controls {
+    box-shadow: 0 -2px 20px var(--warning-glow);
+}
+
+.pulse-border-enabled.pulse-critical #main-controls {
+    box-shadow: 0 -2px 25px var(--danger-glow);
+    animation: pulseControlsCritical 0.4s ease-in-out infinite;
+}
+
+@keyframes pulseControlsCritical {
+    0%, 100% { box-shadow: 0 -2px 20px var(--danger-glow); }
+    50% { box-shadow: 0 -2px 40px var(--danger-glow); }
+}

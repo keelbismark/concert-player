@@ -4,22 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pro Concert Player v3.1</title>
+    
+    <!-- Core CSS -->
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/playlist.css">
     <link rel="stylesheet" href="css/controls.css">
     <link rel="stylesheet" href="css/modals.css">
+    <link rel="stylesheet" href="css/touch.css">
+    
+    <!-- Enhancement CSS -->
+    <link rel="stylesheet" href="css/ambient.css">
+    <link rel="stylesheet" href="css/setlist.css">
+    <link rel="stylesheet" href="css/timeline.css">
+    <link rel="stylesheet" href="css/quickactions.css">
+    <link rel="stylesheet" href="css/pulseborders.css">
+    
     <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#07080a">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-
-    <!-- Additional CSS -->
-    <link rel="stylesheet" href="css/touch.css">
 </head>
 <body>
+
+    <!-- Ambient Glow Background -->
+    <div class="ambient-glow" id="ambient-glow"></div>
 
     <!-- Header -->
     <header class="header">
@@ -63,6 +74,45 @@
     <main class="main-container">
         <!-- Playlist Panel -->
         <section class="playlist-panel">
+            
+            <!-- Setlist Progress -->
+            <div class="setlist-progress" id="setlist-progress">
+                <div class="setlist-progress-item">
+                    <div class="setlist-progress-header">
+                        <span class="setlist-progress-label">Треки</span>
+                        <span class="setlist-progress-value" id="setlist-tracks-text">0 / 0</span>
+                    </div>
+                    <div class="setlist-progress-bar">
+                        <div class="setlist-progress-fill tracks" id="setlist-tracks-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="setlist-progress-divider"></div>
+                
+                <div class="setlist-progress-item">
+                    <div class="setlist-progress-header">
+                        <span class="setlist-progress-label">Время</span>
+                        <span class="setlist-progress-value" id="setlist-time-text">00:00 / 00:00</span>
+                    </div>
+                    <div class="setlist-progress-bar">
+                        <div class="setlist-progress-fill time" id="setlist-time-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="setlist-progress-divider"></div>
+                
+                <div class="setlist-stats">
+                    <div class="setlist-stat">
+                        <div class="setlist-stat-value" id="setlist-remaining-tracks">0</div>
+                        <div class="setlist-stat-label">Осталось</div>
+                    </div>
+                    <div class="setlist-stat">
+                        <div class="setlist-stat-value end-time" id="setlist-end-time">--:--</div>
+                        <div class="setlist-stat-label">Конец</div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="panel-header">
                 <div class="panel-title">
                     <span class="panel-title-icon">📋</span>
@@ -144,6 +194,19 @@
                 <div class="time-display">
                     <span id="time-current">0:00</span>
                     <span id="time-total">0:00</span>
+                </div>
+            </div>
+
+            <!-- Timeline Ruler -->
+            <div class="timeline-container" id="timeline-container">
+                <div class="timeline-ruler">
+                    <div class="timeline-track" id="timeline-track">
+                        <div class="timeline-progress" id="timeline-progress" style="width: 0%"></div>
+                        <div class="timeline-hover" id="timeline-hover">0:00</div>
+                    </div>
+                    <div class="timeline-marks" id="timeline-marks">
+                        <!-- Метки генерируются динамически -->
+                    </div>
                 </div>
             </div>
 
@@ -278,7 +341,6 @@
                 <span class="hotkey-action">Полный экран</span>
                 <span class="hotkey-key">F</span>
             </div>
-            <!-- В секцию .hotkeys-list добавить: -->
             <div class="hotkey-item">
                 <span class="hotkey-action">Добавить метку</span>
                 <span class="hotkey-key">M</span>
@@ -301,7 +363,7 @@
     <input type="file" id="file-input" multiple accept="audio/*" hidden>
     <input type="file" id="import-input" accept=".json" hidden>
 
-    <!-- Scripts -->
+    <!-- Core Scripts -->
     <script src="js/utils.js"></script>
     <script src="js/Settings.js"></script>
     <script src="js/AudioEngine.js"></script>
@@ -312,7 +374,18 @@
     <script src="js/QRCode.js"></script>
     <script src="js/DragDropPlaylist.js"></script>
     <script src="js/PageProtection.js"></script>
+    
+    <!-- Enhancement Scripts -->
+    <script src="js/AmbientGlow.js"></script>
+    <script src="js/SetlistProgress.js"></script>
+    <script src="js/TimelineRuler.js"></script>
+    <script src="js/QuickActionsWheel.js"></script>
+    <script src="js/PulseBorders.js"></script>
+    
+    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    
+    <!-- Main App -->
     <script src="js/app.js"></script>
 </body>
 </html>
